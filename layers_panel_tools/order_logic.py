@@ -6,7 +6,7 @@ SEP_PREFIX = "lpt:sep:"
 MAX_ROWS = 10
 # 首次安装和「恢复默认」时不勾选。默认勾选的按钮不在这张表里：
 # 标注、批量选择图层、图层管理、编辑记录、批量导出、按多边形选择、底图切换、图层开关、
-# 独显图层、闪烁定位、图层操作、线标注、分类导出。
+# 独显图层、闪烁定位、图层操作、线标注、分类导出、多点画线。
 DEFAULT_HIDDEN = (
     "lpt:organize",
     "lpt:repair",
@@ -39,6 +39,7 @@ DEFAULT_PLUGIN_ORDER = (
     "lpt:layer_ops",
     "lpt:line_ends",
     "lpt:class_export",
+    "lpt:multiline",
     "lpt:organize",
     "lpt:repair",
     "lpt:find",
@@ -59,6 +60,17 @@ def is_separator(button_id):
     return str(button_id).startswith(SEP_PREFIX)
 
 
+def is_ephemeral(button_id):
+    """Unmatched native buttons get tip:/slot: ids for the session only. Never treat them as a layout reset."""
+    token = str(button_id or "")
+    return token.startswith("tip:") or token.startswith("slot:")
+
+
+def strip_ephemeral(order):
+    """Drop tip:/slot: ids so one unmatched button cannot wipe the saved toolbar layout."""
+    return [str(item) for item in (order or []) if str(item) and not is_ephemeral(item)]
+
+
 def merge_order(saved_order, current_ids, original_ids):
     """Keep a saved order. Buttons that were not in it are appended in the default order."""
     current = set(current_ids)
@@ -66,7 +78,7 @@ def merge_order(saved_order, current_ids, original_ids):
     seen = set()
     for item in saved_order or []:
         item = str(item)
-        if item in seen:
+        if item in seen or is_ephemeral(item):
             continue
         if is_separator(item) or item in current:
             result.append(item)
@@ -137,6 +149,8 @@ def factory_hidden(order):
 def factory_row(button_id):
     """Native QGIS row 1; default-on plugin buttons row 2; default-off plugin row 3."""
     bid = str(button_id)
+    if bid.startswith("tp:"):
+        return 2
     if not bid.startswith("lpt:"):
         return 1
     if bid == SETTINGS_ID:
@@ -204,4 +218,26 @@ def self_check():
     assert factory_row("lpt:find") == 3  # nosec
     assert factory_row(SETTINGS_ID) == 2  # nosec
     assert sort_plugin_tools(["lpt:find", "lpt:labels"]) == ["lpt:labels", "lpt:find"]  # nosec
+    assert "lpt:multiline" in DEFAULT_PLUGIN_ORDER  # nosec
+    assert "lpt:multiline" not in DEFAULT_HIDDEN  # nosec
+    assert factory_row("tp:demo") == 2  # nosec
+    assert "tp:demo" not in DEFAULT_PLUGIN_ORDER  # nosec
+    kept = merge_order(["lpt:labels", "tp:demo", "lpt:multiline"], {"lpt:labels", "lpt:multiline", "tp:demo"}, ["lpt:labels", "lpt:multiline"])
+    assert kept == ["lpt:labels", "tp:demo", "lpt:multiline"]  # nosec
+
+    assert factory_row("lpt:multiline") == 2  # nosec
+    assert sort_plugin_tools(["lpt:organize", "lpt:multiline", "lpt:class_export"]) == [
+        "lpt:class_export",
+        "lpt:multiline",
+        "lpt:organize",
+    ]  # nosec
+    assert is_ephemeral("tip:deadbeef") and is_ephemeral("slot:3")  # nosec
+    assert not is_ephemeral("obj:mActionAddGroup")  # nosec
+    assert strip_ephemeral(["lpt:labels", "tip:aa", "slot:1", "lpt:find"]) == ["lpt:labels", "lpt:find"]  # nosec
+    # One tip:/slot: in a saved order must not discard the rest.
+    assert merge_order(  # nosec
+        ["lpt:labels", "tip:aa", "lpt:find"],
+        {"lpt:labels", "lpt:find", "lpt:settings"},
+        ["lpt:labels", "lpt:find", "lpt:settings"],
+    ) == ["lpt:labels", "lpt:find", "lpt:settings"]
     return True

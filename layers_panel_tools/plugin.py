@@ -47,6 +47,7 @@ from .switchboard import make_menu_action as switch_menu_action
 from .layer_ops import make_menu_action as layer_ops_menu_action
 from .line_ends import close_line_ends, make_menu_action as line_ends_menu_action
 from .class_export import close_class_export, make_menu_action as class_export_menu_action
+from .multiline_tool import close_multiline, make_menu_action as multiline_menu_action
 from .context_menu import ContextMenus
 from .toolbar_host import ToolbarHost, plain_title
 from .visibility_all import make_menu_action_hide as hide_all_menu_action, make_menu_action_show as show_all_menu_action
@@ -116,6 +117,7 @@ class LayersPanelToolsPlugin:
             layer_ops_menu_action(self.iface),
             line_ends_menu_action(self.iface),
             class_export_menu_action(self.iface),
+            multiline_menu_action(self.iface),
         ]
         self._mount_menu()
         language_changed().connect(self._on_language)
@@ -198,6 +200,7 @@ class LayersPanelToolsPlugin:
         close_perf()
         close_class_export()
         close_line_ends()
+        close_multiline()
         try:
             stop_flash()
         except Exception:
@@ -207,6 +210,18 @@ class LayersPanelToolsPlugin:
         except Exception:
             pass  # nosec
         self._remove_menu()
+        try:
+            from .shared_toolbar import restore_all
+
+            restore_all(self.iface)
+        except Exception:
+            pass  # nosec
+        try:
+            from .context_menu import apply_thirdparty_original_visibility, load_menu
+
+            apply_thirdparty_original_visibility(self.iface, load_menu(), restore_all=True)
+        except Exception:
+            pass  # nosec
         host = self.host
         self.host = None
         if host is not None:

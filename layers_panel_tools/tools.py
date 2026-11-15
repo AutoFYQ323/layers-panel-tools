@@ -27,6 +27,7 @@ from .copy_layer_files import make_action as copy_files_action
 from .layer_ops import make_action as layer_ops_action
 from .line_ends import make_action as line_ends_action
 from .class_export import make_action as class_export_action
+from .multiline_tool import make_action as multiline_action
 
 
 def extra_actions(iface):
@@ -46,6 +47,7 @@ def extra_actions(iface):
         layer_ops_action(iface),
         line_ends_action(iface),
         class_export_action(iface),
+        multiline_action(iface),
         organize_action(iface),
         repair_action(iface),
         find_action(iface),

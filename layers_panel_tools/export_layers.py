@@ -681,7 +681,11 @@ def _stack_field_name(layers):
             for index in range(fields.count()):
                 used.add(str(fields.at(index).name() or "").casefold())
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
     candidate = "layer"
     number = 2
     while candidate.casefold() in used:

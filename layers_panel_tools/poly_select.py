@@ -257,7 +257,11 @@ def _select_by_polygon(iface, geom, visible_only):
                 if ids or layer.selectedFeatureCount():
                     layer.selectByIds(ids)
             except Exception:
-                continue  # nosec
+                _lpt_skip = True
+            else:
+                _lpt_skip = False
+            if _lpt_skip:
+                continue
             if ids:
                 layers_hit += 1
                 hit += len(ids)
@@ -587,7 +591,11 @@ class MultiMoveTool(QgsMapTool):
                     band.addGeometry(QgsGeometry(geometry), layer)
                     shown += 1
                 except Exception:
-                    continue  # nosec
+                    _lpt_skip = True
+                else:
+                    _lpt_skip = False
+                if _lpt_skip:
+                    continue
 
     def _clear_preview(self):
         kinds = (

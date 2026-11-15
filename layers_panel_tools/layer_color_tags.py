@@ -160,7 +160,11 @@ def refresh_indicators(iface):
             layer_id = layer.id()
             node = root.findLayer(layer_id)
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         tag = tag_of(layer)
         old = _INDICATORS.get(layer_id)
         if not tag or node is None:

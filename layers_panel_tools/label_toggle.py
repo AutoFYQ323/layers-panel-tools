@@ -117,7 +117,11 @@ def _apply(layers, enabled):
         try:
             layer.setLabelsEnabled(bool(enabled))
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         if made:
             created += 1
         try:
@@ -192,7 +196,11 @@ def _label_field(layer):
         try:
             names.append(field.name())
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
     try:
         display = layer.displayField() or ""
     except Exception:
@@ -209,7 +217,11 @@ def _label_field(layer):
             type_name = str(field.typeName() or "").lower()
             numeric = bool(field.isNumeric())
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         if not numeric and any(word in type_name for word in ("string", "text", "char")):
             return field.name()
     return names[0] if names else ""

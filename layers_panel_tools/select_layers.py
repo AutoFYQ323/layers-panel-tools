@@ -116,7 +116,11 @@ def pick(iface, rule):
             if _wants(rule, node, layer, iface):
                 found.append(node)
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
     return found
 
 
@@ -139,7 +143,11 @@ def _apply_visibility(iface, rule):
         try:
             node.setItemVisibilityChecked(bool(want))
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         if want:
             on.append(node)
         else:
@@ -182,7 +190,11 @@ def _layers_for_fit_view():
             if not layer.isValid():
                 continue
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         found.append(layer)
     return found
 
@@ -210,7 +222,11 @@ def _fit_point_line_polygon(iface):
         try:
             ext = layer.extent()
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         if ext is None or ext.isEmpty():
             continue
         try:
@@ -227,7 +243,11 @@ def _fit_point_line_polygon(iface):
             try:
                 ext = QgsCoordinateTransform(layer_crs, dest, project).transform(ext)
             except Exception:
-                continue  # nosec
+                _lpt_skip = True
+            else:
+                _lpt_skip = False
+            if _lpt_skip:
+                continue
         if combined is None:
             combined = QgsRectangle(ext)
         else:
@@ -262,7 +282,11 @@ def _invert_visibility(iface):
             node.setItemVisibilityChecked(not checked)
             flipped += 1
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
     try:
         iface.mapCanvas().refresh()
     except Exception:

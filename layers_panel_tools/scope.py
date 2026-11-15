@@ -177,7 +177,11 @@ def set_legend_on(legend, on):
             if legend.setData(value, role):
                 return True
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
     return _set_legend_on_renderer(legend, on)
 
 
@@ -264,7 +268,11 @@ def _collect_legend_children(model, parent, found, seen):
         try:
             index = model.index(row, 0, parent)
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         legend = None
         try:
             legend = model.index2legendNode(index)
@@ -333,7 +341,11 @@ def legend_parent_nodes(iface):
         try:
             layer_id = layer.id()
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         if not layer_id or layer_id in seen:
             continue
         try:

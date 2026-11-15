@@ -159,7 +159,11 @@ class PerfDialog(QDialog):
                 ms = self._time_layer(canvas, layer)
                 results.append((ms, name, layer.id()))
             except Exception:
-                continue  # nosec
+                _lpt_skip = True
+            else:
+                _lpt_skip = False
+            if _lpt_skip:
+                continue
             QCoreApplication.processEvents()
         results.sort(key=lambda item: -item[0])
         for ms, name, layer_id in results:
@@ -224,7 +228,11 @@ class PerfDialog(QDialog):
                 if item.checkState() != Qt.CheckState.Checked:
                     continue
             except Exception:
-                continue  # nosec
+                _lpt_skip = True
+            else:
+                _lpt_skip = False
+            if _lpt_skip:
+                continue
             node = root.findLayer(layer_id)
             if node is not None:
                 node.setItemVisibilityChecked(False)

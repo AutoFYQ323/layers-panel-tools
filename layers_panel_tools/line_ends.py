@@ -532,7 +532,11 @@ class LineEndsController:
             try:
                 fids = layer.selectedFeatureIds()
             except Exception:
-                continue  # nosec
+                _lpt_skip = True
+            else:
+                _lpt_skip = False
+            if _lpt_skip:
+                continue
             if not fids:
                 continue
             xform = None

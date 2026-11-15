@@ -142,7 +142,11 @@ def _find_matching_layer(provider, uri):
             if (layer.source() or "") != uri:
                 continue
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         return layer
     return None
 

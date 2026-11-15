@@ -71,7 +71,11 @@ def ensure_actions(iface, button_id=None):
                 action.setProperty("lpt_parent", bid)
                 action.triggered.connect(lambda _checked=False, run=runner: run(iface))
             except Exception:
-                continue  # nosec
+                _lpt_skip = True
+            else:
+                _lpt_skip = False
+            if _lpt_skip:
+                continue
             _actions[sub_id] = action
             created.append(action)
     return created
@@ -96,7 +100,11 @@ def retitle():
             msgid = str(action.property("lpt_msgid") or "")
             action.setText(display_title(sub_id, msgid, titles))
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
 
 
 def add_to_menu(iface, button_id, menu, sub_id):

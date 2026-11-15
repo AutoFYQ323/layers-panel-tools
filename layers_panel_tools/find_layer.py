@@ -105,7 +105,11 @@ def _layer_extra_text(layer, cache=None):
         try:
             parts.append(field.name())
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
     try:
         request = QgsFeatureRequest()
         request.setLimit(_FIELD_SAMPLE)

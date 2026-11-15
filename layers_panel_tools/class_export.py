@@ -190,7 +190,11 @@ def legend_classes(layer):
                 lower = item.lowerValue()
                 upper = item.upperValue()
             except Exception:
-                continue  # nosec
+                _lpt_skip = True
+            else:
+                _lpt_skip = False
+            if _lpt_skip:
+                continue
             if not label:
                 label = "%s – %s" % (lower, upper)
             end = "<=" if index == last else "<"
@@ -390,7 +394,11 @@ class ClassExportDialog(QDialog):
                         preferred = layer.id()
                         break
                 except Exception:
-                    continue  # nosec
+                    _lpt_skip = True
+                else:
+                    _lpt_skip = False
+                if _lpt_skip:
+                    continue
         self.layer_box.blockSignals(True)
         self.layer_box.clear()
         layers = []

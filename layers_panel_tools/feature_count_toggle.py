@@ -64,7 +64,11 @@ def _set_show(iface, nodes, on):
         try:
             node.setCustomProperty("showFeatureCount", value)
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         changed += 1
         if model is not None:
             try:

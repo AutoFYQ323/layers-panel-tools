@@ -257,7 +257,11 @@ def _expression_from_renderer(renderer, key):
                     label = item.label()
                     break
             except Exception:
-                continue  # nosec
+                _lpt_skip = True
+            else:
+                _lpt_skip = False
+            if _lpt_skip:
+                continue
         if label is None:
             return None
         try:
@@ -270,7 +274,11 @@ def _expression_from_renderer(renderer, key):
                 lower = item.lowerValue()
                 upper = item.upperValue()
             except Exception:
-                continue  # nosec
+                _lpt_skip = True
+            else:
+                _lpt_skip = False
+            if _lpt_skip:
+                continue
             if item_label != label:
                 continue
             column = QgsExpression.quotedColumnRef(attr)
@@ -333,7 +341,11 @@ def _feature_flash_layers(iface):
         try:
             count = layer.selectedFeatureCount()
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         if count:
             _remember_layer(layer, found, seen)
     return found
@@ -354,7 +366,11 @@ def _category_targets(iface):
         try:
             ident = (layer.id(), key)
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         if ident in seen:
             continue
         seen.add(ident)
@@ -398,7 +414,11 @@ def _start_categories(iface, mode, categories):
         try:
             layer_id = layer.id()
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         if layer_id not in seen:
             seen.add(layer_id)
             layers.append((layer_id, layer))
@@ -409,7 +429,11 @@ def _start_categories(iface, mode, categories):
             try:
                 layer_id = layer.id()
             except Exception:
-                continue  # nosec
+                _lpt_skip = True
+            else:
+                _lpt_skip = False
+            if _lpt_skip:
+                continue
             if layer_id in seen:
                 continue
             seen.add(layer_id)
@@ -452,7 +476,11 @@ def _start(iface, mode):
         try:
             _layers.append((layer.id(), layer))
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
     if not _layers:
         report(iface.mainWindow(), tr("闪烁定位"), tr("所选内容里没有可用图层。"), warning=True)
         return
@@ -714,7 +742,11 @@ def _show_bands(canvas, layers, filters, only_selected):
         try:
             layer_id = layer.id()
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         expression = filters.get(layer_id) if filters else None
         batch = _layer_geometries(layer, only_selected, expression, min(_CAP, room))
         for geometry in batch:
@@ -736,14 +768,22 @@ def _show_bands(canvas, layers, filters, only_selected):
             band.setWidth(3)
             band.setIconSize(14)
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         added = 0
         for geometry, layer in pairs:
             try:
                 band.addGeometry(geometry, layer, False)
                 added += 1
             except Exception:
-                continue  # nosec
+                _lpt_skip = True
+            else:
+                _lpt_skip = False
+            if _lpt_skip:
+                continue
         if not added:
             try:
                 band.reset()

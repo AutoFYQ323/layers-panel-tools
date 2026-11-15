@@ -16,6 +16,8 @@ from qgis.PyQt.QtWidgets import (
     QListWidgetItem,
     QMenu,
     QDialogButtonBox,
+    QLayout,
+    QSizePolicy,
     QTabWidget,
     QTextBrowser,
     QToolButton,
@@ -28,7 +30,7 @@ from .buttons import report
 from .check_i18n import language_endonym, offered_languages
 from .i18n import apply_direction, current_language, set_language, tr, subscribe
 from . import subcommands
-from .order_logic import MAX_ROWS, SEP_PREFIX
+from .order_logic import MAX_ROWS, SEP_PREFIX, SETTINGS_ID
 from .settings_store import load_shortcuts, load_titles
 from .qt_compat import accepted, enum_int, qt_attr, run_dialog, user_role
 from .toolbar_host import plain_title
@@ -274,7 +276,8 @@ class SettingsDialog(QDialog):
     def __init__(self, rows, default_rows, parent=None, iface=None):
         super().__init__(parent)
         self.setObjectName("LayersPanelToolsSettingsDialog")
-        self.resize(640, 580)
+        self.resize(650, 620)
+        self.setMaximumWidth(650)
         self._defaults = list(default_rows)
         self._languages = offered_languages()
         self._listening = False
@@ -288,7 +291,13 @@ class SettingsDialog(QDialog):
         self._moving = False
 
         layout = QVBoxLayout(self)
+        try:
+            layout.setSizeConstraint(qt_attr(QLayout, "SetNoConstraint"))
+        except Exception:
+            pass  # nosec
         self.tabs = QTabWidget()
+        self.tabs.setMinimumWidth(0)
+        self.tabs.setSizePolicy(qt_attr(QSizePolicy, "Expanding"), qt_attr(QSizePolicy, "Expanding"))
         toolbar_page = QWidget()
         page_layout = QVBoxLayout(toolbar_page)
         page_layout.setContentsMargins(0, 8, 0, 0)
@@ -309,9 +318,12 @@ class SettingsDialog(QDialog):
         page_layout.addLayout(self._head)
 
         self.list = QListWidget()
+        self.list.setMinimumWidth(0)
+        self.list.setSizePolicy(qt_attr(QSizePolicy, "Expanding"), qt_attr(QSizePolicy, "Expanding"))
         self.list.setDragDropMode(qt_attr(QAbstractItemView, "InternalMove"))
         self.list.setSelectionMode(qt_attr(QAbstractItemView, "SingleSelection"))
         self.list.currentItemChanged.connect(lambda *_args: self._update_delete())
+        self.list.itemChanged.connect(self._keep_settings_checked)
         self.list.verticalScrollBar().valueChanged.connect(self._place_combos)
         self._placer = _ComboPlacer(self)
         self.list.viewport().installEventFilter(self._placer)
@@ -394,9 +406,8 @@ class SettingsDialog(QDialog):
     def showEvent(self, event):
         super().showEvent(event)
         self._place_combos()
-        if not getattr(self, "_menu_ready", False):
-            self._menu_ready = True
-            self.menu_page.refresh()
+        self.setMaximumWidth(650)
+        self.resize(650, 620)
 
     def result_order(self):
         self._sync_rows()
@@ -411,7 +422,12 @@ class SettingsDialog(QDialog):
                 continue
             order.append(button_id)
             rows[button_id] = self._item_row(item)
-            if kind in ("native", "plugin") and enum_int(item.checkState(), 2) == 0:
+            is_settings = kind == "settings" or str(button_id) == SETTINGS_ID
+            if (
+                not is_settings
+                and kind in ("native", "plugin", "proxy")
+                and enum_int(item.checkState(), 2) == 0
+            ):
                 hidden.append(button_id)
         titles = {}
         shortcuts = {}
@@ -478,6 +494,14 @@ class SettingsDialog(QDialog):
     def commit_menu(self):
         self.menu_page.commit()
 
+    def toolbar_item_visible(self, button_id):
+        button_id = str(button_id or "")
+        for index in range(self.list.count()):
+            item = self.list.item(index)
+            if str(item.data(_ID) or "") == button_id:
+                return enum_int(item.checkState(), 2) != 0
+        return False
+
     def title_for(self, button_id):
         button_id = str(button_id or "")
         self._sync_rows()
@@ -505,12 +529,13 @@ class SettingsDialog(QDialog):
 
     def _on_tab(self, index):
         toolbar = index == 0
-        for button in (self.btn_up, self.btn_down, self.btn_sep, self.btn_reset):
+        for button in (self.btn_up, self.btn_down, self.btn_sep, self.btn_delete, self.btn_reset):
+            button.setVisible(toolbar)
             button.setEnabled(toolbar)
         if toolbar:
             self._update_delete()
         else:
-            self.btn_delete.setEnabled(False)
+            self.menu_page.ensure_loaded()
             self.menu_page.sync_toolbar_titles()
 
     def _fill_languages(self):
@@ -553,6 +578,18 @@ class SettingsDialog(QDialog):
         dialog = HelpDialog(lines, self)
         dialog.exec_dialog()
 
+    def _keep_settings_checked(self, item):
+        if item is None or not self._listening:
+            return
+        if item.data(_KIND) != "settings" and str(item.data(_ID) or "") != SETTINGS_ID:
+            return
+        checked = qt_attr(Qt, "Checked")
+        if enum_int(item.checkState(), 2) == enum_int(checked, 2):
+            return
+        self.list.blockSignals(True)
+        item.setCheckState(checked)
+        self.list.blockSignals(False)
+
     def _add_row(self, row):
         item = QListWidgetItem()
         item.setData(_ID, row["id"])
@@ -569,10 +606,13 @@ class SettingsDialog(QDialog):
         if icon is not None and not icon.isNull():
             item.setIcon(icon)
         flags = qt_attr(Qt, "ItemIsEnabled") | qt_attr(Qt, "ItemIsSelectable") | qt_attr(Qt, "ItemIsDragEnabled")
-        if row["kind"] in ("native", "plugin"):
+        if row["kind"] in ("native", "plugin", "proxy", "settings"):
             flags = flags | qt_attr(Qt, "ItemIsUserCheckable")
             item.setFlags(flags)
-            item.setCheckState(qt_attr(Qt, "Checked" if row.get("visible", True) else "Unchecked"))
+            if row["kind"] == "settings" or str(row.get("id") or "") == SETTINGS_ID:
+                item.setCheckState(qt_attr(Qt, "Checked"))
+            else:
+                item.setCheckState(qt_attr(Qt, "Checked" if row.get("visible", True) else "Unchecked"))
         else:
             item.setFlags(flags)
         self._refresh_text(item)
@@ -917,6 +957,8 @@ class SettingsDialog(QDialog):
             name = tr("图层面板工具设置")
         elif kind == "plugin":
             name = tr(msgid) if msgid else native
+        elif kind == "proxy":
+            name = custom or native or str(item.data(_ID) or "")
         else:
             name = plain_title(native)
             if not name and msgid:
@@ -926,9 +968,12 @@ class SettingsDialog(QDialog):
         text = name
         if kind == "native":
             text = text + tr("（自有）")
-        elif kind in ("plugin", "settings"):
+        elif kind in ("plugin", "settings", "proxy"):
             text = text + tr("（第三方）")
         item.setText(text)
+        if kind == "settings" or str(item.data(_ID) or "") == SETTINGS_ID:
+            item.setToolTip(title_tip(text, tr("必须显示，不能关闭。")))
+            return
         help_msgid = str(item.data(_HELP_MSGID) or "")
         help_text = tr(help_msgid) if help_msgid else str(item.data(_HELP) or "")
         body = help_text if (help_text and help_text != name) else ""

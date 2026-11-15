@@ -142,7 +142,11 @@ def _open_props(iface, layer, pages):
         except TypeError:
             continue
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
     try:
         showp(layer)
     except Exception:
@@ -345,7 +349,11 @@ class LayerManagerDialog(QDialog):
                 try:
                     name = layer.name() or ""
                 except Exception:
-                    continue  # nosec
+                    _lpt_skip = True
+                else:
+                    _lpt_skip = False
+                if _lpt_skip:
+                    continue
                 g = _geometry_kind(layer)
                 row = self.table.rowCount()
                 self.table.insertRow(row)

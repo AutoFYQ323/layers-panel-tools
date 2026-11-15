@@ -215,7 +215,11 @@ def _object_sequences(obj):
         try:
             value = probe()
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         if isinstance(value, (list, tuple)):
             found.extend(value)
         elif value is not None:

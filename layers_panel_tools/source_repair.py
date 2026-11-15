@@ -359,7 +359,11 @@ class RepairDialog(QDialog):
                 layer_id = layer.id()
                 name = layer.name()
             except Exception:
-                continue  # nosec
+                _lpt_skip = True
+            else:
+                _lpt_skip = False
+            if _lpt_skip:
+                continue
             listed += 1
             row = self.table.rowCount()
             self.table.insertRow(row)

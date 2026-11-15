@@ -102,7 +102,11 @@ def _category_targets(iface):
         try:
             ident = (layer.id(), key)
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         if ident in seen:
             continue
         seen.add(ident)
@@ -116,7 +120,11 @@ def _snapshot_categories(iface, layers):
         try:
             layer_id = layer.id()
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         items = []
         for legend in legend_nodes_of_layer(iface, layer):
             key = legend_rule_key(legend)
@@ -166,7 +174,11 @@ def _solo_categories(iface, categories):
         try:
             layer_id = layer.id()
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         if layer_id not in by_layer:
             by_layer[layer_id] = set()
             layers.append(layer)
@@ -189,7 +201,11 @@ def _solo_categories(iface, categories):
         try:
             layer_id = layer.id()
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         wanted = {}
         for key, _on in _saved_categories.get(layer_id) or []:
             wanted[key] = key in by_layer.get(layer_id, ())

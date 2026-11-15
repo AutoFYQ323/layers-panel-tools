@@ -23,6 +23,8 @@ _NESTED = (
     "OpenModeFlag",
     "ResizeMode",
     "ScrollHint",
+    "ScrollBarPolicy",
+    "DropIndicatorPosition",
     "Policy",
     "Mode",
     "State",

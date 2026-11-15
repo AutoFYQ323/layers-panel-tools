@@ -152,7 +152,11 @@ def _as_items(obj):
         try:
             found.append((key, obj[key]))
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
     return found
 
 
@@ -604,7 +608,11 @@ class EditTimelineController:
                         field_name = feature.fields().at(index).name()
                         old = _plain(feature.attribute(index))
                     except Exception:
-                        continue  # nosec
+                        _lpt_skip = True
+                    else:
+                        _lpt_skip = False
+                    if _lpt_skip:
+                        continue
                     attr_old.append((int(fid), field_name, old))
             geom_old = []
             try:

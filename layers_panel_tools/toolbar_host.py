@@ -27,9 +27,11 @@ from .order_logic import (
     factory_hidden,
     factory_row,
     hidden_for_load,
-    sort_plugin_tools,
+    is_ephemeral,
     is_separator,
     merge_order,
+    sort_plugin_tools,
+    strip_ephemeral,
 )
 from .qt_compat import qt_attr
 from .tools import extra_actions
@@ -83,7 +85,50 @@ _ROLE_LABELS = {
 }
 
 
+def _is_extra_row_bar(bar):
+    if bar is None:
+        return False
+    try:
+        name = bar.objectName() or ""
+    except RuntimeError:
+        return False
+    return name.startswith("LayersPanelToolsRow")
+
+
+def _layout_toolbars(iface):
+    """Toolbars currently sitting in the Layers panel widget layout, in layout order."""
+    found = []
+    main = iface.mainWindow() if iface is not None else None
+    dock = main.findChild(QDockWidget, "Layers") if main is not None else None
+    view = None
+    try:
+        view = iface.layerTreeView() if iface is not None else None
+    except Exception:
+        view = None
+    if dock is None and view is not None and view.parent() is not None:
+        dock = view.parent().parent()
+    if dock is None:
+        return found
+    container = dock.widget()
+    layout = container.layout() if container is not None else None
+    if layout is None:
+        return found
+    for index in range(layout.count()):
+        item = layout.itemAt(index)
+        widget = item.widget() if item is not None else None
+        if isinstance(widget, QToolBar):
+            found.append(widget)
+    return found
+
+
 def find_toolbar(iface):
+    """The native Layers panel toolbar in the current layout, not a leftover extra row."""
+    bars = _layout_toolbars(iface)
+    for bar in bars:
+        if not _is_extra_row_bar(bar):
+            return bar
+    if bars:
+        return bars[0]
     main = iface.mainWindow()
     dock = main.findChild(QDockWidget, "Layers") if main is not None else None
     view = iface.layerTreeView()
@@ -91,16 +136,11 @@ def find_toolbar(iface):
         dock = view.parent().parent()
     if dock is None:
         return None
-    container = dock.widget()
-    layout = container.layout() if container is not None else None
-    if layout is not None:
-        for index in range(layout.count()):
-            item = layout.itemAt(index)
-            widget = item.widget() if item is not None else None
-            if isinstance(widget, QToolBar):
-                return widget
-    bars = dock.findChildren(QToolBar)
-    return bars[0] if bars else None
+    children = dock.findChildren(QToolBar)
+    for bar in children:
+        if not _is_extra_row_bar(bar):
+            return bar
+    return children[0] if children else None
 
 
 def _icon_mode():
@@ -326,6 +366,12 @@ class ToolbarHost:
             for action in extra_actions(self.iface):
                 self._own(action)
             self._load_and_apply()
+            try:
+                from .context_menu import apply_thirdparty_original_visibility
+
+                apply_thirdparty_original_visibility(self.iface)
+            except Exception:
+                pass  # nosec
         except Exception:
             self.detach()
             raise
@@ -353,26 +399,45 @@ class ToolbarHost:
             same = False
             self.toolbar = None
         if same and self._settings_on_bar():
+            self._ensure_external()
             return True
         self.toolbar = toolbar
         if not same:
             self._refresh_native()
+        self._ensure_external()
         self._place()
         return True
 
+    def _ensure_external(self):
+        """Light keep-alive for Layers-bar proxies only.
+
+        Do not call shared_toolbar.apply_membership here. Rewriting main-window
+        toolbars on every ~1s ensure (and again on every layer right-click) freezes
+        QGIS — Layer Properties and other native dialogs take seconds to open.
+        Membership is applied only when system-properties settings are saved.
+        """
+        if not any(str(key).startswith("tp:") for key in self.by_id):
+            return
+        try:
+            self.sync_thirdparty_proxies(place_if_needed=True)
+        except Exception:
+            pass  # nosec
+
     def _settings_on_bar(self):
+        """True only if the gear is on a toolbar still in the Layers panel's current layout.
+
+        A leftover extra row, or a Python reference still held in extra_bars, does not count.
+        Visibility (including overflow) is not required: the bar must simply be in the layout.
+        """
         action = self.settings_action
         if action is None:
             return True
-        bars = [self.toolbar] + list(self.extra_bars)
-        for bar in bars:
-            if bar is None:
-                continue
+        for bar in _layout_toolbars(self.iface):
             try:
                 if action in list(bar.actions()):
                     return True
             except RuntimeError:
-                return False
+                continue
         return False
 
     def _refresh_native(self):
@@ -402,11 +467,18 @@ class ToolbarHost:
         self.original = fresh
         self._bind_native()
         self.order = merge_order(self.order, self._living_ids(), self._default_ids())
+        self._append_missing_proxies()
         self.hidden = clean_hidden(self.hidden, self.order)
 
     def detach(self):
         if not self.attached:
             return
+        try:
+            from .shared_toolbar import restore_all
+
+            restore_all(self.iface)
+        except Exception:
+            pass  # nosec
         self._restore()
         self.attached = False
 
@@ -433,8 +505,18 @@ class ToolbarHost:
         if titles is None:
             titles = self.titles
         self.titles = clean_titles(titles, self.order)
-        settings_store.save(self.order, self.hidden, self.rows, self.titles, shortcuts)
+        self._append_missing_proxies()
+        self._ensure_settings_ordered()
+        self._persist(shortcuts)
         self._place()
+
+    def _persist(self, shortcuts=None):
+        """Write toolbar layout without tip:/slot: ids that would poison the next launch."""
+        order = strip_ephemeral(self.order)
+        hidden = clean_hidden(self.hidden, order)
+        rows = clean_rows(self.rows, order)
+        titles = clean_titles(self.titles, order)
+        settings_store.save(order, hidden, rows, titles, shortcuts)
 
     def _own(self, action):
         button_id = str(action.property("lpt_id") or "")
@@ -451,7 +533,8 @@ class ToolbarHost:
         used_ids = set()
         kept = {}
         for key, action in list(self.by_id.items()):
-            if str(key).startswith("lpt:"):
+            token = str(key)
+            if token.startswith("lpt:") or token.startswith("tp:"):
                 kept[key] = action
         self.by_id = kept
         self.fallbacks = []
@@ -480,6 +563,8 @@ class ToolbarHost:
             button_id = str(action.property("lpt_id") or "")
             if not button_id or is_separator(button_id) or button_id == SETTINGS_ID:
                 continue
+            if str(button_id).startswith("tp:"):
+                continue
             if button_id not in tools:
                 tools.append(button_id)
         tools = sort_plugin_tools(tools)
@@ -488,23 +573,175 @@ class ToolbarHost:
         return native + tools
 
     def _living_ids(self):
-        return set(self._default_ids())
+        return set(self._default_ids()) | set(self._proxy_ids())
+
+    def _proxy_ids(self):
+        return [key for key in self.by_id if str(key).startswith("tp:")]
+
+    def _append_missing_proxies(self):
+        for key in self._proxy_ids():
+            if key in self.order:
+                continue
+            self.order.append(key)
+            if key not in self.rows:
+                self.rows[key] = factory_row(key)
+
+    def _make_proxy(self, entry):
+        import os
+
+        from .icons import load_icon
+        from .menu_extras import find_plugin_action, trigger_thirdparty
+
+        key = str((entry or {}).get("id") or "")
+        label = str((entry or {}).get("label") or key)
+        window = self.iface.mainWindow()
+        icon = QIcon()
+        try:
+            if (entry or {}).get("kind") == "plugin_action":
+                source = find_plugin_action(entry)
+                if source is not None:
+                    icon = source.icon()
+        except Exception:
+            icon = QIcon()
+        if icon is None or icon.isNull():
+            icon = load_icon("layer_ops")
+        if icon is None or icon.isNull():
+            path = os.path.join(os.path.dirname(__file__), "icon.png")
+            if os.path.isfile(path):
+                icon = QIcon(path)
+        action = QAction(icon, label, window)
+        action.setObjectName("LayersPanelToolsProxy")
+        action.setProperty("lpt_id", key)
+        action.setProperty("lpt_face_label", label)
+        action.setProperty("lpt_msgid", "")
+        help_msgid = "在当前图层上运行该第三方功能或工具箱算法，效果与图层右键中的同一项相同。"
+        tr("在当前图层上运行该第三方功能或工具箱算法，效果与图层右键中的同一项相同。")
+        action.setProperty("lpt_help_msgid", help_msgid)
+        action.triggered.connect(
+            lambda _checked=False, item=dict(entry or {}): trigger_thirdparty(self.iface, item, window)
+        )
+        return action
+
+    def sync_thirdparty_proxies(self, data=None, place_if_needed=True):
+        """Hang, update, or remove opted-in third-party proxies in toolbar order."""
+        if data is None:
+            try:
+                from .context_menu import load_menu
+
+                data = load_menu()
+            except Exception:
+                data = {}
+        data = data or {}
+        thirdparty = {item["id"]: item for item in data.get("thirdparty") or []}
+        # System-properties third-party items never hang on the Layers panel toolbar;
+        # that toolbar is only decided on this plugin's toolbar settings page.
+        wanted = []
+        wanted_set = set(wanted)
+        current = [key for key in list(self.by_id) if str(key).startswith("tp:")]
+        leftover = [key for key in list(self.order) if str(key).startswith("tp:") and key not in wanted_set]
+        changed = False
+        menu_titles = dict(data.get("titles") or {})
+        for key in list(dict.fromkeys(current + leftover)):
+            if key in wanted_set:
+                continue
+            action = self.by_id.pop(key, None)
+            if action in self.owned:
+                self.owned.remove(action)
+            self.order = [item for item in self.order if item != key]
+            self.hidden = [item for item in self.hidden if item != key]
+            self.rows.pop(key, None)
+            self.titles.pop(key, None)
+            if action is not None and action is not self.settings_action:
+                try:
+                    action.deleteLater()
+                except RuntimeError:
+                    pass
+            changed = True
+        for key in wanted:
+            entry = thirdparty[key]
+            action = self.by_id.get(key)
+            if action is None:
+                action = self._make_proxy(entry)
+                self._own(action)
+                changed = True
+            if key not in self.order:
+                self.order.append(key)
+                changed = True
+            if key not in self.rows:
+                self.rows[key] = factory_row(key)
+                changed = True
+            custom = str(menu_titles.get(key) or "").strip()
+            if custom and self.titles.get(key) != custom:
+                self.titles[key] = custom
+                changed = True
+            try:
+                action.setProperty("lpt_face_label", str(entry.get("label") or key))
+            except RuntimeError:
+                pass
+        if changed:
+            self.order = merge_order(self.order, self._living_ids(), self._default_ids())
+            self._append_missing_proxies()
+            self.hidden = clean_hidden(self.hidden, self.order)
+            self.titles = clean_titles(self.titles, self.order)
+            self.rows = clean_rows(self.rows, self.order)
+            try:
+                self._persist()
+            except Exception:
+                pass  # nosec
+            if place_if_needed:
+                self._place()
+            return True
+        self._append_missing_proxies()
+        if place_if_needed and wanted:
+            missing = False
+            bars = [self.toolbar] + list(self.extra_bars)
+            hidden = set(self.hidden)
+            for key in wanted:
+                if key in hidden:
+                    continue
+                action = self.by_id.get(key)
+                if action is None:
+                    continue
+                found = False
+                for bar in bars:
+                    if bar is None:
+                        continue
+                    try:
+                        if action in list(bar.actions()):
+                            found = True
+                            break
+                    except RuntimeError:
+                        continue
+                if not found:
+                    missing = True
+                    break
+            if missing:
+                self._place()
+                return True
+        return False
+
 
     def _load_and_apply(self):
-        saved = settings_store.load_order()
-        stale = bool(saved) and any(str(item).startswith("slot:") or str(item).startswith("tip:") for item in saved)
-        if stale:
+        raw_saved = settings_store.load_order()
+        # Old builds wiped the whole layout when any tip:/slot: was present. Strip those
+        # ids and keep the rest so one unmatched native button cannot reset the toolbar.
+        had_ephemeral = bool(raw_saved) and any(is_ephemeral(item) for item in raw_saved)
+        saved = strip_ephemeral(raw_saved) if raw_saved is not None else None
+        if saved is not None and not saved:
             saved = None
         order = merge_order(saved, self._living_ids(), self._default_ids())
         stored = [] if saved is None else settings_store.load_hidden()
+        stored = [item for item in stored if not is_ephemeral(item)]
         self.order = order
         self.hidden = clean_hidden(hidden_for_load(saved, stored, order), order)
         saved_rows = {} if saved is None else settings_store.load_rows()
         saved_titles = {} if saved is None else settings_store.load_titles()
         self._assign_rows(saved_rows)
         self.titles = clean_titles(saved_titles, self.order)
-        if stale:
-            settings_store.save(self.order, self.hidden, self.rows, self.titles)
+        self._ensure_settings_ordered()
+        self.sync_thirdparty_proxies(place_if_needed=False)
+        if had_ephemeral:
+            self._persist()
         self._place()
 
     def _assign_rows(self, saved_rows):
@@ -534,9 +771,22 @@ class ToolbarHost:
             self.owned.append(action)
         return action
 
+    def _ensure_settings_ordered(self):
+        """Settings is a normal owned button, but it must stay in order and never be hideable."""
+        if self.settings_action is None:
+            return
+        if SETTINGS_ID not in self.by_id:
+            self._own(self.settings_action)
+        if SETTINGS_ID not in self.order:
+            self.order.append(SETTINGS_ID)
+        self.hidden = [item for item in self.hidden if item != SETTINGS_ID]
+        if SETTINGS_ID not in self.rows:
+            self.rows[SETTINGS_ID] = factory_row(SETTINGS_ID)
+
     def _place(self):
         if self.toolbar is None:
             return
+        self._ensure_settings_ordered()
         self._clear_extra_bars()
         try:
             for action in list(self.toolbar.actions()):
@@ -551,6 +801,8 @@ class ToolbarHost:
             if action is None:
                 continue
             show = button_id not in hidden
+            if button_id == SETTINGS_ID:
+                show = True
             try:
                 action.setVisible(show)
             except RuntimeError:
@@ -559,6 +811,14 @@ class ToolbarHost:
             if not show:
                 continue
             buckets.setdefault(self._row_number(button_id), []).append(action)
+        # If the gear somehow dropped out of order/buckets, still put it on row 1.
+        if self.settings_action is not None and id(self.settings_action) not in placed:
+            try:
+                self.settings_action.setVisible(True)
+            except RuntimeError:
+                pass  # nosec
+            buckets.setdefault(self._row_number(SETTINGS_ID), []).append(self.settings_action)
+            placed.add(id(self.settings_action))
         for action, _visible in self.original:
             if id(action) in placed:
                 continue
@@ -570,13 +830,14 @@ class ToolbarHost:
         for action in buckets.get(1) or []:
             self.toolbar.addAction(action)
         try:
-            self.toolbar.setVisible(bool(buckets.get(1)))
+            self.toolbar.setVisible(bool(buckets.get(1)) or self.settings_action is not None)
         except RuntimeError:
             return
         parent = self.toolbar.parentWidget()
         layout = parent.layout() if parent is not None else None
         if layout is None:
             self._paint_tips()
+            self._guarantee_settings_visible()
             return
         index = layout.indexOf(self.toolbar)
         insert_at = index + 1 if index >= 0 else layout.count()
@@ -592,6 +853,20 @@ class ToolbarHost:
             for action in actions:
                 bar.addAction(action)
         self._paint_tips()
+        self._guarantee_settings_visible()
+
+    def _guarantee_settings_visible(self):
+        """Last-resort: if the gear is still not on any live Layers toolbar, pin it to the native bar."""
+        if self.settings_action is None or self.toolbar is None:
+            return
+        if self._settings_on_bar():
+            return
+        try:
+            self.settings_action.setVisible(True)
+            self.toolbar.addAction(self.settings_action)
+            self.toolbar.setVisible(True)
+        except RuntimeError:
+            pass  # nosec
 
     def _paint_tips(self):
         for button_id, action in list(self.by_id.items()):
@@ -779,6 +1054,8 @@ class ToolbarHost:
             help_text = ""
         if button_id == SETTINGS_ID:
             kind = "settings"
+        elif str(button_id).startswith("tp:"):
+            kind = "proxy"
         elif str(button_id).startswith("lpt:"):
             kind = "plugin"
         else:

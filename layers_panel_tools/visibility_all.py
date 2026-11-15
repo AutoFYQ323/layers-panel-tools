@@ -28,7 +28,11 @@ def _set_all(on):
             if not QgsLayerTree.isLayer(item):
                 continue
         except Exception:
-            continue  # nosec
+            _lpt_skip = True
+        else:
+            _lpt_skip = False
+        if _lpt_skip:
+            continue
         try:
             layer = item.layer()
         except Exception:

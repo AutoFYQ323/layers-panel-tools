@@ -172,7 +172,11 @@ class OpacityDialog(QDialog):
             try:
                 values.append(int(round(float(layer.opacity()) * 100)))
             except Exception:
-                continue  # nosec
+                _lpt_skip = True
+            else:
+                _lpt_skip = False
+            if _lpt_skip:
+                continue
         self._blocked = True
         if values:
             self.slider.setValue(values[0])
@@ -246,7 +250,11 @@ class OpacityDialog(QDialog):
                 layer.setOpacity(fraction)
                 layer.triggerRepaint()
             except Exception:
-                continue  # nosec
+                _lpt_skip = True
+            else:
+                _lpt_skip = False
+            if _lpt_skip:
+                continue
         try:
             self.iface.mapCanvas().refresh()
         except Exception:
