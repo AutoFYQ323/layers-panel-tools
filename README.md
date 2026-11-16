@@ -1,6 +1,6 @@
-# Layers Panel Tools
+﻿# Layers Panel Tools
 
-QGIS plugin that adds buttons to the toolbar of the existing Layers panel. Version **1.0.10**. There is no icon on the main QGIS toolbar, and the built-in Layers panel is not replaced.
+QGIS plugin that adds buttons to the toolbar of the existing Layers panel. Version **1.0.12**. There is no icon on the main QGIS toolbar, and the built-in Layers panel is not replaced.
 
 - **Page:** https://yuyouhui.online/tools/qgis/layers-panel-tools/
 - **Issues:** https://github.com/AutoFYQ323/layers-panel-tools/issues
@@ -15,7 +15,7 @@ Labels, batch select, layer manager, edit timeline, batch export, polygon select
 
 Sixteen more are one click away in the settings button at the end of the same toolbar: **multi-point draw line**, **line direction check**, **quick classify**, organize, repair sources, find, show all, hide all, move, opacity, copy style, rename, copy files, color tags, scale check, and render check. The old “split by field into subset layers” button is gone. Writing one file per field value is class export.
 
-## What 1.0.10 adds (from 1.0.5 / 1.0.8)
+## What 1.0.12 adds (from 1.0.5)
 
 - **Line direction check:** pick a start point and several line layers; join only when endpoints meet within the tolerance; reverse wrong segments from the results. Toolbar slot sits between multi-point draw line and organize; **off by default**. Settings use this plugin’s own ini only (`line_dir_free` / `line_dir_tolerance`).
 - **Quick classify:** assign selected features from symbology classes; pin a layer to copy geometry from another layer then classify; optional skip-confirm and timed auto-save. Same toolbar area; **off by default**.
@@ -30,7 +30,7 @@ When only a category row is selected, solo, flash, and “toggle the selected ca
 
 ## Install
 
-1. Download [layers_panel_tools_1.0.10.zip](https://github.com/AutoFYQ323/layers-panel-tools/releases), or use the `layers_panel_tools` folder in this repository. The same zip is also on the page above, named `layers-panel-tools-1.0.10.zip`. You can also search for Layers Panel Tools in the QGIS plugin repository.
+1. Download [layers_panel_tools_1.0.12.zip](https://github.com/AutoFYQ323/layers-panel-tools/releases), or use the `layers_panel_tools` folder in this repository. The same zip is also on the page above, named `layers-panel-tools-1.0.12.zip`. You can also search for Layers Panel Tools in the QGIS plugin repository.
 2. In QGIS: **Plugins → Manage and Install Plugins → Install from ZIP**.
 3. Quit QGIS completely and open it again. Buttons are on the Layers panel toolbar. Settings is the last button on that bar.
 

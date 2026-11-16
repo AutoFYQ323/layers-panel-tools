@@ -3,7 +3,7 @@ name=Layers Panel Tools
 qgisMinimumVersion=3.28
 qgisMaximumVersion=4.99
 description=Buttons on the existing Layers panel toolbar: multi-point draw line, line direction check, quick classify, layer visibility schemes, batch select, layer manager, batch export, export by class, layer actions, line marks, polygon select, feature counts, basemap presets, solo, flash locate, and more, with per-button shortcuts and a layer right-click menu that can include third-party tools
-version=1.0.10
+version=1.0.12
 author=youyu
 email=jd_sys_xx@163.com
 about=Layers Panel Tools adds buttons to the toolbar of the existing Layers panel. After installation there is no main-window toolbar icon: every button, and the Layers Panel Tools settings button on the same toolbar, sits on the Layers panel itself. Buttons show an icon only; the name appears on hover and can be renamed.
@@ -19,16 +19,14 @@ tags=layers, panel, toolbar, visibility, organize, rename, opacity, style, label
 homepage=https://yuyouhui.online/tools/qgis/layers-panel-tools/
 tracker=https://github.com/AutoFYQ323/layers-panel-tools/issues
 repository=https://github.com/AutoFYQ323/layers-panel-tools
-changelog=1.0.10
-    Keeps Qt 5 and Qt 6 enum forms current for QGIS 3.28–4.99 (DateFormat.ISODate, FeatureRequest Flag.NoGeometry). Same features as 1.0.9.
-    1.0.9
+changelog=1.0.12
     New: line direction check and quick classify on the Layers toolbar between multi-point draw line and organize; both off by default. Multi-point draw line is also off by default; its toolbar slot is unchanged. Settings for these tools use this plugin’s own ini only.
     Fix: settings gear stays on the current Layers toolbar layout and is forced visible like other buttons (checkbox required on); unmatched native tip:/slot: ids no longer wipe the whole saved toolbar order.
     Fix: opening System Properties with an empty layer-menu list silently captures default right-click items; OK on a still-blank page no longer overwrites a previously saved order.
     New: multi-point draw line on the Layers toolbar (rectangle / polygon / draw-line pick, numbered yellow snap badges matching LocalLine logic, auto-generate after pick, no separate Generate button).
     New: system properties can add third-party plugin actions (installed plugins only), with collapsible color-coded groups (up to 20), native items allowed in groups, and drag that no longer deletes rows. Toolbar checkbox for third-party actions only toggles the original top toolbar (PROC-style), never the Layers panel toolbar.
     Shared QGIS actions such as Toggle Editing keep separate Menu and Toolbar checkboxes.
-    Metadata jumps from 1.0.5 to 1.0.9.
+    Metadata jumps from 1.0.5 to 1.0.12.
     1.0.5
     Batch export reports the folder or file when it finishes. For CSV, merge adds a second box, off by default and not remembered: one sheet per layer, written as a same-named Excel workbook because CSV cannot hold sheets; when checked, one CSV table. A field name shared by several layers appears once, and no layer’s fields are dropped.
     Export by class writes one file per legend class, or one file per distinct field value. A classified layer starts from the legend; an ordinary layer starts from a field. Split by field, which added subset layers inside the project, is removed.
