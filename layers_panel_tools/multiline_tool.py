@@ -111,14 +111,30 @@ def _make_field(name):
         return QgsField(name=name, type=_string_type())
 
 
+def _bump_project_gen(*_args):
+    _PROJECT_GEN[0] = _PROJECT_GEN[0] + 1
+
+
 def _watch_project():
     if _PROJECT_WATCHED[0]:
         return
     try:
         project = QgsProject.instance()
-        project.cleared.connect(lambda: _PROJECT_GEN.__setitem__(0, _PROJECT_GEN[0] + 1))
-        project.readProject.connect(lambda *_args: _PROJECT_GEN.__setitem__(0, _PROJECT_GEN[0] + 1))
+        project.cleared.connect(_bump_project_gen)
+        project.readProject.connect(_bump_project_gen)
         _PROJECT_WATCHED[0] = True
+    except Exception:
+        pass  # nosec
+
+
+def _unwatch_project():
+    if not _PROJECT_WATCHED[0]:
+        return
+    _PROJECT_WATCHED[0] = False
+    try:
+        project = QgsProject.instance()
+        project.cleared.disconnect(_bump_project_gen)
+        project.readProject.disconnect(_bump_project_gen)
     except Exception:
         pass  # nosec
 
@@ -372,6 +388,7 @@ def close_multiline():
             dialog.close()
         except RuntimeError:
             pass
+    _unwatch_project()
 
 
 def open_multiline(iface):

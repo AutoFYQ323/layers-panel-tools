@@ -39,6 +39,8 @@ _NESTED = (
     "SequenceFormat",
     "SequenceMatch",
     "Icon",
+    "DateFormat",
+    "Flag",
 )
 
 
@@ -81,6 +83,45 @@ def run_dialog(dialog):
     if not callable(runner):
         runner = getattr(dialog, "exec_")
     return enum_int(runner(), 0)
+
+
+def run_exec(widget, *args):
+    """QDialog and QMenu: exec on Qt 6, the older name on Qt 5."""
+    runner = getattr(widget, "exec", None)
+    if not callable(runner):
+        runner = getattr(widget, "exec_")
+    return runner(*args)
+
+
+def make_qgs_field(name, qtype, type_name="", length=0, precision=0):
+    """QgsField for Qt 6 (QMetaType) and Qt 5 (QVariant type)."""
+    from qgis.PyQt.QtCore import QVariant
+    from qgis.core import QgsField
+
+    try:
+        from qgis.PyQt.QtCore import QMetaType
+
+        mapping = {
+            QVariant.Int: QMetaType.Type.Int,
+            QVariant.UInt: QMetaType.Type.UInt,
+            QVariant.LongLong: QMetaType.Type.LongLong,
+            QVariant.ULongLong: QMetaType.Type.ULongLong,
+            QVariant.Double: QMetaType.Type.Double,
+            QVariant.String: QMetaType.Type.QString,
+            QVariant.Bool: QMetaType.Type.Bool,
+            QVariant.Date: QMetaType.Type.QDate,
+            QVariant.DateTime: QMetaType.Type.QDateTime,
+        }
+        meta = mapping.get(qtype)
+        if meta is not None:
+            if type_name:
+                return QgsField(name, meta, type_name, int(length), int(precision))
+            return QgsField(name, meta)
+    except (TypeError, AttributeError, ValueError):
+        pass  # nosec B110
+    if type_name:
+        return QgsField(name, qtype, type_name, int(length), int(precision))
+    return QgsField(name, qtype)
 
 
 def accepted(code):

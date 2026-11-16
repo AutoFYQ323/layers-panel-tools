@@ -6,8 +6,11 @@ SEP_PREFIX = "lpt:sep:"
 MAX_ROWS = 10
 # 首次安装和「恢复默认」时不勾选。默认勾选的按钮不在这张表里：
 # 标注、批量选择图层、图层管理、编辑记录、批量导出、按多边形选择、底图切换、图层开关、
-# 独显图层、闪烁定位、图层操作、线标注、分类导出、多点画线。
+# 独显图层、闪烁定位、图层操作、线标注、分类导出。
 DEFAULT_HIDDEN = (
+    "lpt:multiline",
+    "lpt:line_dir",
+    "lpt:quick_classify",
     "lpt:organize",
     "lpt:repair",
     "lpt:find",
@@ -40,6 +43,8 @@ DEFAULT_PLUGIN_ORDER = (
     "lpt:line_ends",
     "lpt:class_export",
     "lpt:multiline",
+    "lpt:line_dir",
+    "lpt:quick_classify",
     "lpt:organize",
     "lpt:repair",
     "lpt:find",
@@ -219,16 +224,22 @@ def self_check():
     assert factory_row(SETTINGS_ID) == 2  # nosec
     assert sort_plugin_tools(["lpt:find", "lpt:labels"]) == ["lpt:labels", "lpt:find"]  # nosec
     assert "lpt:multiline" in DEFAULT_PLUGIN_ORDER  # nosec
-    assert "lpt:multiline" not in DEFAULT_HIDDEN  # nosec
+    assert "lpt:multiline" in DEFAULT_HIDDEN  # nosec
+    assert "lpt:line_dir" in DEFAULT_PLUGIN_ORDER  # nosec
+    assert "lpt:line_dir" in DEFAULT_HIDDEN  # nosec
+    assert "lpt:quick_classify" in DEFAULT_PLUGIN_ORDER  # nosec
+    assert "lpt:quick_classify" in DEFAULT_HIDDEN  # nosec
     assert factory_row("tp:demo") == 2  # nosec
     assert "tp:demo" not in DEFAULT_PLUGIN_ORDER  # nosec
     kept = merge_order(["lpt:labels", "tp:demo", "lpt:multiline"], {"lpt:labels", "lpt:multiline", "tp:demo"}, ["lpt:labels", "lpt:multiline"])
     assert kept == ["lpt:labels", "tp:demo", "lpt:multiline"]  # nosec
 
-    assert factory_row("lpt:multiline") == 2  # nosec
-    assert sort_plugin_tools(["lpt:organize", "lpt:multiline", "lpt:class_export"]) == [
+    assert factory_row("lpt:multiline") == 3  # nosec
+    assert sort_plugin_tools(["lpt:organize", "lpt:quick_classify", "lpt:line_dir", "lpt:multiline", "lpt:class_export"]) == [
         "lpt:class_export",
         "lpt:multiline",
+        "lpt:line_dir",
+        "lpt:quick_classify",
         "lpt:organize",
     ]  # nosec
     assert is_ephemeral("tip:deadbeef") and is_ephemeral("slot:3")  # nosec

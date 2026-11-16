@@ -2385,4 +2385,22 @@ def _load_extra():
     AR.update(module.AR)
 
 
+def _load_line_dir():
+    """Merge translations for the ported line_dir package."""
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).with_name("catalog_line_dir.py")
+    if not path.is_file():
+        return
+    spec = importlib.util.spec_from_file_location("lpt_catalog_line_dir", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    EN.update(module.EN)
+    ES.update(module.ES)
+    FR.update(module.FR)
+    AR.update(module.AR)
+
+
 _load_extra()
+_load_line_dir()

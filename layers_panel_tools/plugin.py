@@ -23,7 +23,7 @@ from .flash_locate import make_menu_action as flash_menu_action
 from .flash_locate import stop_flash
 from .i18n import language_changed, tr
 from .label_toggle import make_menu_action as label_menu_action
-from .layer_color_tags import make_menu_action as layer_tags_menu_action
+from .layer_color_tags import close_layer_tags, make_menu_action as layer_tags_menu_action
 from .layer_manager import close_layer_manager, make_menu_action as layer_manager_menu_action
 from .move_layers import make_menu_action as move_menu_action
 from .opacity_tool import close_opacity
@@ -48,6 +48,8 @@ from .layer_ops import make_menu_action as layer_ops_menu_action
 from .line_ends import close_line_ends, make_menu_action as line_ends_menu_action
 from .class_export import close_class_export, make_menu_action as class_export_menu_action
 from .multiline_tool import close_multiline, make_menu_action as multiline_menu_action
+from .line_dir_tool import close_line_dir, make_menu_action as line_dir_menu_action
+from .quick_classify import close_quick_classify, make_menu_action as quick_classify_menu_action
 from .context_menu import ContextMenus
 from .toolbar_host import ToolbarHost, plain_title
 from .visibility_all import make_menu_action_hide as hide_all_menu_action, make_menu_action_show as show_all_menu_action
@@ -118,6 +120,8 @@ class LayersPanelToolsPlugin:
             line_ends_menu_action(self.iface),
             class_export_menu_action(self.iface),
             multiline_menu_action(self.iface),
+            line_dir_menu_action(self.iface),
+            quick_classify_menu_action(self.iface),
         ]
         self._mount_menu()
         language_changed().connect(self._on_language)
@@ -201,6 +205,12 @@ class LayersPanelToolsPlugin:
         close_class_export()
         close_line_ends()
         close_multiline()
+        close_line_dir()
+        close_quick_classify()
+        try:
+            close_layer_tags()
+        except Exception:
+            pass  # nosec
         try:
             stop_flash()
         except Exception:

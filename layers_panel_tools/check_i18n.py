@@ -13,7 +13,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-SKIP_DIRS = {"__pycache__", "i18n"}
+# line_dir：自 AttributeTable 移植的专用检查包，句子多且与主界面语言包分开维护。
+SKIP_DIRS = {"__pycache__", "i18n", "line_dir"}
 SKIP_FILES = {"check_i18n.py", "self_test.py"}
 _HAN = __import__("re").compile(r"[\u4e00-\u9fff]")
 

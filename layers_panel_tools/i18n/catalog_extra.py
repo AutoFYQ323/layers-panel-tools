@@ -486,6 +486,503 @@ def _rows():
         "Exécute cette fonction tierce ou cet algorithme de la boîte à outils sur la couche actuelle, comme le même élément du menu contextuel de la couche.",
         "شغّل وظيفة الطرف الثالث أو خوارزمية صندوق الأدوات هذه على الطبقة الحالية، بنفس أثر البند المقابل في قائمة النقر اليميني للطبقة.",
     )
+    add(
+        '自选起点和多个线图层，检查线方向是否从起点向外连贯，端点在容差内才算相接。可在结果里翻转反向线段。',
+        'Pick a start point and several line layers; check that line direction runs outward from the start, joining only when endpoints meet within the tolerance. Reverse wrong segments from the results.',
+        'Elige un punto de partida y varias capas de líneas; comprueba que la dirección sale desde el inicio y solo une extremos dentro de la tolerancia. En el resultado puedes invertir tramos al revés.',
+        'Choisissez un point de départ et plusieurs couches de lignes ; vérifiez que le sens part du départ et ne joint les extrémités que dans la tolérance. Inversez les segments à contresens dans le résultat.',
+        'اختر نقطة بداية وعدة طبقات خطوط؛ تحقق أن الاتجاه يخرج من البداية وأن الأطراف تتصل فقط ضمن التسامح. يمكن عكس المقاطع المعكوسة من النتائج.',
+    )
+    add(
+        '按图层符号化分类给选中要素赋值；可钉住图层，从其他层复制几何后再分类。支持跳过确认与定时自动保存。',
+        'Assign selected features from the layer’s symbology classes; pin a layer to copy geometry from another layer, then classify. Skip confirmations and timed auto-save are available.',
+        'Asigna entidades seleccionadas según las clases de simbología; fija una capa para copiar geometría desde otra y luego clasificar. Se puede saltar la confirmación y guardar automáticamente a tiempo.',
+        'Attribuez les entités sélectionnées d’après les classes de symbologie ; épinglez une couche pour copier la géométrie d’une autre, puis classer. Confirmation facultative et enregistrement automatique temporisé.',
+        'عيّن المعالم المحددة حسب فئات الترميز؛ ثبّت طبقة لنسخ الهندسة من طبقة أخرى ثم صنّف. يمكن تخطي التأكيد والحفظ التلقائي المؤقت.',
+    )
+    add(
+        '快速分类',
+        'Quick classify',
+        'Clasificación rápida',
+        'Classification rapide',
+        'تصنيف سريع',
+    )
+    add(
+        '没有图层',
+        'No layer',
+        'Sin capa',
+        'Pas de couche',
+        'لا طبقة',
+    )
+    add(
+        '图层没有符号化',
+        'The layer has no symbology',
+        'La capa no tiene simbología',
+        'La couche n’a pas de symbologie',
+        'الطبقة بلا ترميز',
+    )
+    add(
+        '无法复制符号化',
+        'Cannot clone symbology',
+        'No se puede copiar la simbología',
+        'Impossible de cloner la symbologie',
+        'تعذّر نسخ الترميز',
+    )
+    add(
+        '无法调用 QGIS 保存',
+        'Cannot call QGIS save',
+        'No se puede llamar al guardado de QGIS',
+        'Impossible d’appeler l’enregistrement QGIS',
+        'تعذّر استدعاء حفظ QGIS',
+    )
+    add(
+        '找不到 QGIS 自带的保存编辑',
+        'QGIS Save Layer Edits action not found',
+        'No se encuentra Guardar ediciones de la capa de QGIS',
+        'Action Enregistrer les modifications de la couche introuvable',
+        'لم يُعثر على حفظ تحرير الطبقة في QGIS',
+    )
+    add(
+        '请选择一个矢量图层',
+        'Choose a vector layer',
+        'Elige una capa vectorial',
+        'Choisissez une couche vectorielle',
+        'اختر طبقة متجهة',
+    )
+    add(
+        '该分类没有可反推的字段值',
+        'This class has no reverse-engineered field values',
+        'Esta clase no tiene valores de campo deducibles',
+        'Cette classe n’a pas de valeurs de champs déductibles',
+        'هذه الفئة بلا قيم حقول قابلة للاستنتاج',
+    )
+    add(
+        '请先在地图或属性表中选中要素',
+        'Select features on the map or in the attribute table first',
+        'Selecciona primero entidades en el mapa o en la tabla de atributos',
+        'Sélectionnez d’abord des entités sur la carte ou dans la table d’attributs',
+        'حدد معالم على الخريطة أو في جدول السمات أولًا',
+    )
+    add(
+        '规则里的字段在当前图层上不存在',
+        'A field in the rule is missing on the current layer',
+        'Falta en la capa actual un campo de la regla',
+        'Un champ de la règle manque sur la couche actuelle',
+        'حقل في القاعدة غير موجود في الطبقة الحالية',
+    )
+    add(
+        '没有分类图层',
+        'No classify layer',
+        'Sin capa de clasificación',
+        'Pas de couche de classification',
+        'لا طبقة تصنيف',
+    )
+    add(
+        '请先选中要复制的图层要素',
+        'Select the source-layer features to copy first',
+        'Selecciona primero las entidades de la capa a copiar',
+        'Sélectionnez d’abord les entités de la couche à copier',
+        'حدد أولًا معالم الطبقة المراد نسخها',
+    )
+    add(
+        '几何类型不同，无法复制进分类图层（点/线/面须同类）',
+        'Geometry types differ; cannot copy into the classify layer (point/line/polygon must match)',
+        'Tipos de geometría distintos; no se puede copiar a la capa de clasificación (punto/línea/polígono deben coincidir)',
+        'Types de géométrie différents ; impossible de copier dans la couche de classification (point/ligne/polygone doivent correspondre)',
+        'أنواع الهندسة مختلفة؛ لا يمكن النسخ إلى طبقة التصنيف (نقطة/خط/مضلع يجب أن تتطابق)',
+    )
+    add(
+        '请先在来源图层选中要素',
+        'Select features on the source layer first',
+        'Selecciona primero entidades en la capa de origen',
+        'Sélectionnez d’abord des entités sur la couche source',
+        'حدد معالم في طبقة المصدر أولًا',
+    )
+    add(
+        '规则里的字段在分类图层上不存在',
+        'A field in the rule is missing on the classify layer',
+        'Falta en la capa de clasificación un campo de la règle',
+        'Un champ de la règle manque sur la couche de classification',
+        'حقل في القاعدة غير موجود في طبقة التصنيف',
+    )
+    add(
+        '图层无法保存',
+        'The layer cannot be saved',
+        'La capa no se puede guardar',
+        'La couche ne peut pas être enregistrée',
+        'لا يمكن حفظ الطبقة',
+    )
+    add(
+        '无法切到要保存的图层',
+        'Cannot switch to the layer to save',
+        'No se puede cambiar a la capa a guardar',
+        'Impossible de passer à la couche à enregistrer',
+        'تعذّر التبديل إلى الطبقة المطلوب حفظها',
+    )
+    add(
+        '当前图层没有符号化',
+        'The current layer has no symbology',
+        'La capa actual no tiene simbología',
+        'La couche actuelle n’a pas de symbologie',
+        'الطبقة الحالية بلا ترميز',
+    )
+    add(
+        '当前是渐变符号化，无法反推成确定字段值',
+        'Graduated symbology cannot reverse into fixed field values',
+        'La simbología graduada no se puede deducir a valores de campo fijos',
+        'Une symbologie graduée ne se déduit pas en valeurs de champs fixes',
+        'الترميز المتدرج لا يُستنتج إلى قيم حقول ثابتة',
+    )
+    add(
+        '当前符号化不是分类/规则（%s），没有可点选的分类',
+        'Current symbology is not categorized/rule-based (%s); no clickable classes',
+        'La simbología actual no es categorizada/por reglas (%s); no hay clases clicables',
+        'La symbologie actuelle n’est pas catégorisée/par règles (%s) ; pas de classes cliquables',
+        'الترميز الحالي ليس مصنّفًا/قائمًا على قواعد (%s)؛ لا فئات قابلة للنقر',
+    )
+    add(
+        '无法开始编辑该图层',
+        'Cannot start editing this layer',
+        'No se puede empezar a editar esta capa',
+        'Impossible de commencer l’édition de cette couche',
+        'تعذّر بدء تحرير هذه الطبقة',
+    )
+    add(
+        '无法开始编辑分类图层',
+        'Cannot start editing the classify layer',
+        'No se puede empezar a editar la capa de clasificación',
+        'Impossible de commencer l’édition de la couche de classification',
+        'تعذّر بدء تحرير طبقة التصنيف',
+    )
+    add(
+        '没有可复制的几何',
+        'No geometry to copy',
+        'No hay geometría que copiar',
+        'Pas de géométrie à copier',
+        'لا هندسة للنسخ',
+    )
+    add(
+        '无法复制符号化：%s',
+        'Cannot clone symbology: %s',
+        'No se puede copiar la simbología: %s',
+        'Impossible de cloner la symbologie : %s',
+        'تعذّر نسخ الترميز: %s',
+    )
+    add(
+        '其它值 / 空类，无法反推赋值',
+        'Other / empty class; cannot reverse into an assignment',
+        'Otra / clase vacía; no se puede deducir una asignación',
+        'Autre / classe vide ; impossible d’en déduire une assignation',
+        'قيم أخرى / فئة فارغة؛ لا يمكن استنتاج تعيين',
+    )
+    add(
+        '表达式分类无法反推字段值',
+        'Expression-based classes cannot reverse into field values',
+        'Las clases por expresión no deducen valores de campo',
+        'Les classes par expression ne déduisent pas de valeurs de champs',
+        'فئات التعبير لا تُستنتج إلى قيم حقول',
+    )
+    add(
+        'ELSE（其余）规则，无法反推赋值',
+        'ELSE (remainder) rule; cannot reverse into an assignment',
+        'Regla ELSE (resto); no se puede deducir una asignación',
+        'Règle ELSE (reste) ; impossible d’en déduire une assignation',
+        'قاعدة ELSE (الباقي)؛ لا يمكن استنتاج تعيين',
+    )
+    add(
+        '字段「%s」存不下值「%s」（%s）',
+        'Field “%s” cannot store value “%s” (%s)',
+        'El campo «%s» no puede guardar el valor «%s» (%s)',
+        'Le champ « %s » ne peut pas stocker la valeur « %s » (%s)',
+        'الحقل «%s» لا يستوعب القيمة «%s» (%s)',
+    )
+    add(
+        '读取分类失败：%s',
+        'Failed to read classes: %s',
+        'Error al leer las clases: %s',
+        'Échec de lecture des classes : %s',
+        'فشل قراءة الفئات: %s',
+    )
+    add(
+        '来源图层和分类图层的坐标系无法转换，没有复制',
+        'Source and classify layer CRS cannot be transformed; nothing copied',
+        'No se puede transformar el SRC entre origen y clasificación; no se ha copiado nada',
+        'Impossible de transformer le SCR source / classification ; rien n’a été copié',
+        'تعذّر تحويل مرجع الإحداثيات بين المصدر والتصنيف؛ لم يُنسخ شيء',
+    )
+    add(
+        '坐标系转换失败，没有复制：%s',
+        'CRS transform failed; nothing copied: %s',
+        'Falló la transformación de SRC; no se ha copiado nada: %s',
+        'Échec de transformation SCR ; rien n’a été copié : %s',
+        'فشل تحويل مرجع الإحداثيات؛ لم يُنسخ شيء: %s',
+    )
+    add(
+        '写入失败',
+        'Write failed',
+        'Error al escribir',
+        'Échec d’écriture',
+        'فشل الكتابة',
+    )
+    add(
+        'ELSE（其余）',
+        'ELSE (remainder)',
+        'ELSE (resto)',
+        'ELSE (reste)',
+        'ELSE (الباقي)',
+    )
+    add(
+        '要素 %s 的几何无法转成分类图层的几何类型',
+        'Feature %s geometry cannot convert to the classify layer geometry type',
+        'La geometría de la entidad %s no se puede convertir al tipo de la capa de clasificación',
+        'La géométrie de l’entité %s ne peut pas être convertie au type de la couche de classification',
+        'هندسة المعلم %s لا تتحول إلى نوع هندسة طبقة التصنيف',
+    )
+    add(
+        '复制要素失败',
+        'Copying features failed',
+        'Error al copiar entidades',
+        'Échec de la copie des entités',
+        'فشل نسخ المعالم',
+    )
+    add(
+        '要素 %s 坐标转换失败，没有复制',
+        'Feature %s coordinate transform failed; not copied',
+        'Falló la transformación de coordenadas de la entidad %s; no se ha copiado',
+        'Échec de transformation des coordonnées de l’entité %s ; non copiée',
+        'فشل تحويل إحداثيات المعلم %s؛ لم يُنسخ',
+    )
+    add(
+        '线方向检查',
+        'Line direction check',
+        'Comprobar dirección de líneas',
+        'Vérifier le sens des lignes',
+        'فحص اتجاه الخطوط',
+    )
+    add(
+        '自选起点和多个线图层，检查线方向是否从起点向外连贯，端点在容差内才算相接',
+        'Pick a start point and several line layers; check that line direction runs outward from the start, joining only when endpoints meet within the tolerance',
+        'Elige un punto de partida y varias capas de líneas; comprueba que la dirección sale desde el inicio y solo une extremos dentro de la tolerancia',
+        'Choisissez un point de départ et plusieurs couches de lignes ; vérifiez que le sens part du départ et ne joint les extrémités que dans la tolérance',
+        'اختر نقطة بداية وعدة طبقات خطوط؛ تحقق أن الاتجاه يخرج من البداية وأن الأطراف تتصل فقط ضمن التسامح',
+    )
+    add(
+        '不自动保存',
+        'Do not auto-save',
+        'No guardar automáticamente',
+        'Ne pas enregistrer automatiquement',
+        'عدم الحفظ التلقائي',
+    )
+    add(
+        '1秒后保存',
+        'Save after 1 second',
+        'Guardar tras 1 segundo',
+        'Enregistrer après 1 seconde',
+        'الحفظ بعد ثانية واحدة',
+    )
+    add(
+        '2秒后保存',
+        'Save after 2 seconds',
+        'Guardar tras 2 segundos',
+        'Enregistrer après 2 secondes',
+        'الحفظ بعد ثانيتين',
+    )
+    add(
+        '3秒后保存',
+        'Save after 3 seconds',
+        'Guardar tras 3 segundos',
+        'Enregistrer après 3 secondes',
+        'الحفظ بعد 3 ثوانٍ',
+    )
+    add(
+        '4秒后保存',
+        'Save after 4 seconds',
+        'Guardar tras 4 segundos',
+        'Enregistrer après 4 secondes',
+        'الحفظ بعد 4 ثوانٍ',
+    )
+    add(
+        '5秒后保存',
+        'Save after 5 seconds',
+        'Guardar tras 5 segundos',
+        'Enregistrer après 5 secondes',
+        'الحفظ بعد 5 ثوانٍ',
+    )
+    add(
+        '10秒后保存',
+        'Save after 10 seconds',
+        'Guardar tras 10 segundos',
+        'Enregistrer après 10 secondes',
+        'الحفظ بعد 10 ثوانٍ',
+    )
+    add(
+        '按图层符号化分类给选中要素赋值；可钉住图层，从其他层复制几何后再分类',
+        'Assign selected features from the layer’s symbology classes; pin a layer to copy geometry from another layer, then classify',
+        'Asigna entidades seleccionadas según las clases de simbología; fija una capa para copiar geometría desde otra y luego clasificar',
+        'Attribuez les entités sélectionnées d’après les classes de symbologie ; épinglez une couche pour copier la géométrie d’une autre, puis classer',
+        'عيّن المعالم المحددة حسب فئات الترميز؛ ثبّت طبقة لنسخ الهندسة من طبقة أخرى ثم صنّف',
+    )
+    add(
+        '请选择矢量图层',
+        'Choose a vector layer',
+        'Elige una capa vectorial',
+        'Choisissez une couche vectorielle',
+        'اختر طبقة متجهة',
+    )
+    add(
+        '钉住图层',
+        'Pin layer',
+        'Fijar capa',
+        'Épingler la couche',
+        'تثبيت الطبقة',
+    )
+    add(
+        '钉住当前分类图层。在本层选中要素再点分类：只改属性、不复制。在其他层选中再点分类：把几何复制进钉住层，再按该类规则赋值。来源图层不改；钉住层不增加来源字段。',
+        'Pin the current classify layer. Select features on this layer and click a class: attributes only, no copy. Select on another layer and click a class: copy geometries into the pinned layer, then assign by that class. The source layer is unchanged; the pinned layer does not gain source fields.',
+        'Fija la capa de clasificación actual. Si seleccionas en esta capa y pulsas una clase: solo atributos, sin copiar. Si seleccionas en otra capa y pulsas una clase: se copian las geometrías a la capa fijada y se asignan por esa clase. La capa de origen no cambia; la fijada no gana campos del origen.',
+        'Épinglez la couche de classification actuelle. Sélection sur cette couche puis clic sur une classe : attributs seulement, pas de copie. Sélection sur une autre couche puis clic : géométries copiées dans la couche épinglée, puis assignation selon la classe. La couche source ne change pas ; la couche épinglée n’ajoute pas les champs source.',
+        'ثبّت طبقة التصنيف الحالية. التحديد في هذه الطبقة ثم النقر على فئة: سمات فقط بلا نسخ. التحديد في طبقة أخرى ثم النقر: تُنسخ الهندسات إلى الطبقة المثبتة ثم تُعيَّن حسب الفئة. طبقة المصدر لا تتغير؛ والطبقة المثبتة لا تكتسب حقول المصدر.',
+    )
+    add(
+        '默认「不自动保存」：还能撤销/回滚，QGIS 图例数量不会马上变。选「N秒后保存」：先只写入，等 N 秒再点一次 QGIS 自带的「保存图层编辑」。连续命名会按当前秒数重新计时，只存一次。中途改成不自动保存则取消这次预约。图例由 QGIS 自己刷。会保存该层当前所有未保存修改，这次不能再撤销。关掉窗口会立刻补存。3 秒已验证能跟上图例；1 秒可能仍偏赶。',
+        'Default “Do not auto-save”: undo/rollback still work, and QGIS legend counts do not update at once. Choose “Save after N seconds”: writes first, then after N seconds triggers QGIS “Save Layer Edits” once. Continuous classify resets the timer to the current delay and saves once. Switching to no auto-save cancels the pending save. The legend refreshes itself. Saving commits every unsaved edit on that layer and cannot be undone. Closing the window flushes any pending save. 3 seconds keeps up with the legend; 1 second may still race.',
+        'Por defecto «No guardar automáticamente»: aún se puede deshacer y los conteos de leyenda de QGIS no cambian al momento. Con «Guardar tras N segundos» se escribe primero y, tras N segundos, se dispara una vez «Guardar ediciones de la capa» de QGIS. Clasificar seguido reinicia el temporizador al retardo actual y guarda una sola vez. Pasar a no auto-guardar cancela la reserva. La leyenda la refresca QGIS. Se guardan todas las ediciones sin guardar de esa capa y ya no se puede deshacer. Al cerrar la ventana se guarda lo pendiente. 3 s sigue la leyenda; 1 s puede ir corto.',
+        'Par défaut « Ne pas enregistrer automatiquement » : l’annulation reste possible et les compteurs de légende QGIS ne bougent pas tout de suite. Avec « Enregistrer après N secondes », écriture d’abord, puis après N secondes un seul « Enregistrer les modifications de la couche » de QGIS. Une classification continue relance le délai courant et n’enregistre qu’une fois. Passer à sans auto-enregistrement annule la réserve. La légende se rafraîchit toute seule. Cela enregistre toutes les modifications non sauvées de la couche et ne peut plus être annulé. Fermer la fenêtre force l’enregistrement en attente. 3 s suit la légende ; 1 s peut être trop court.',
+        'الافتراضي «عدم الحفظ التلقائي»: ما زال التراجع ممكنًا وعدادات مفتاح QGIS لا تتغير فورًا. مع «الحفظ بعد N ثانية» تُكتب أولًا، ثم بعد N ثانية يُشغَّل مرة واحدة «حفظ تحرير الطبقة» في QGIS. التصنيف المتتابع يعيد ضبط المؤقت على التأخير الحالي ويحفظ مرة واحدة. التحويل إلى عدم الحفظ التلقائي يلغي الموعد. المفتاح يحدّثه QGIS. يُحفظ كل تعديل غير محفوظ في الطبقة ولا يمكن التراجع. إغلاق النافذة يحفظ المعلّق فورًا. 3 ثوانٍ تواكب المفتاح؛ ثانية واحدة قد تكون مستعجلة.',
+    )
+    add(
+        '勾选后点分类不再确认，直接赋值',
+        'When checked, clicking a class assigns at once with no confirmation',
+        'Si está marcado, al pulsar una clase se asigna sin confirmar',
+        'Si coché, un clic sur une classe assigne sans confirmation',
+        'عند التحديد، النقر على فئة يعيّن مباشرة بلا تأكيد',
+    )
+    add(
+        '默认不勾选：会弹出确认。勾选后直接写入。',
+        'Off by default: a confirmation appears. When checked, writes at once.',
+        'Desmarcado por defecto: pide confirmación. Marcado: escribe al instante.',
+        'Décoché par défaut : une confirmation s’affiche. Coché : écriture immédiate.',
+        'غير محدد افتراضيًا: يظهر تأكيد. عند التحديد تُكتب مباشرة.',
+    )
+    add(
+        '刷新图例计数',
+        'Refresh legend counts',
+        'Actualizar conteos de leyenda',
+        'Rafraîchir les compteurs de légende',
+        'تحديث عدادات المفتاح',
+    )
+    add(
+        '请先选择一个矢量图层。',
+        'Choose a vector layer first.',
+        'Elige primero una capa vectorial.',
+        'Choisissez d’abord une couche vectorielle.',
+        'اختر طبقة متجهة أولًا.',
+    )
+    add(
+        '请在 QGIS 中选择一个矢量图层',
+        'Select a vector layer in QGIS',
+        'Selecciona una capa vectorial en QGIS',
+        'Sélectionnez une couche vectorielle dans QGIS',
+        'حدد طبقة متجهة في QGIS',
+    )
+    add(
+        '钉住：%s',
+        'Pinned: %s',
+        'Fijada: %s',
+        'Épinglée : %s',
+        'مثبّتة: %s',
+    )
+    add(
+        '这个分类无法从符号化规则反推出要写的字段值。',
+        'This class cannot reverse its symbology rule into field values to write.',
+        'Esta clase no puede deducir de la simbología los valores de campo a escribir.',
+        'Cette classe ne peut pas déduire de la symbologie les valeurs de champs à écrire.',
+        'لا يمكن لهذه الفئة استنتاج قيم الحقول من قاعدة الترميز.',
+    )
+    add(
+        '请先在地图或属性表中选中要素。',
+        'Select features on the map or in the attribute table first.',
+        'Selecciona primero entidades en el mapa o en la tabla de atributos.',
+        'Sélectionnez d’abord des entités sur la carte ou dans la table d’attributs.',
+        'حدد معالم على الخريطة أو في جدول السمات أولًا.',
+    )
+    add(
+        '已写入，但 QGIS 保存失败：%s',
+        'Written, but QGIS save failed: %s',
+        'Escrito, pero el guardado de QGIS falló: %s',
+        'Écrit, mais l’enregistrement QGIS a échoué : %s',
+        'كُتب، لكن حفظ QGIS فشل: %s',
+    )
+    add(
+        '(未命名)',
+        '(unnamed)',
+        '(sin nombre)',
+        '(sans nom)',
+        '(بلا اسم)',
+    )
+    add(
+        '已选中 %s 个要素。\n将归属到分类「%s」。\n写入：%s\n继续？',
+        '%s feature(s) selected.\nAssign to class “%s”.\nWrite: %s\nContinue?',
+        '%s entidad(es) seleccionada(s).\nAsignar a la clase «%s».\nEscribir: %s\n¿Continuar?',
+        '%s entité(s) sélectionnée(s).\nAttribuer à la classe « %s ».\nÉcrire : %s\nContinuer ?',
+        'تم تحديد %s معلمًا.\nالإسناد إلى الفئة «%s».\nالكتابة: %s\nمتابعة؟',
+    )
+    add(
+        '将把 %s 个要素从「%s」复制到「%s」，并归属分类「%s」。\n来源图层不改。写入：%s\n继续？',
+        'Copy %s feature(s) from “%s” into “%s” and assign class “%s”.\nThe source layer is unchanged. Write: %s\nContinue?',
+        'Copiar %s entidad(es) de «%s» a «%s» y asignar la clase «%s».\nLa capa de origen no cambia. Escribir: %s\n¿Continuar?',
+        'Copier %s entité(s) de « %s » vers « %s » et attribuer la classe « %s ».\nLa couche source ne change pas. Écrire : %s\nContinuer ?',
+        'نسخ %s معلمًا من «%s» إلى «%s» وإسناد الفئة «%s».\nطبقة المصدر لا تتغير. الكتابة: %s\nمتابعة؟',
+    )
+    add(
+        '不是真/假',
+        'Not true/false',
+        'No es verdadero/falso',
+        'Pas vrai/faux',
+        'ليست صح/خطأ',
+    )
+    add(
+        '小数已四舍五入',
+        'Decimal rounded',
+        'Decimal redondeado',
+        'Décimale arrondie',
+        'قُرّب الكسر',
+    )
+    add(
+        '不是有效日期/时间',
+        'Not a valid date/time',
+        'No es una fecha/hora válida',
+        'Pas une date/heure valide',
+        'ليست تاريخًا/وقتًا صالحًا',
+    )
+    add(
+        '超过字段长度 %s',
+        'Exceeds field length %s',
+        'Supera la longitud del campo %s',
+        'Dépasse la longueur du champ %s',
+        'يتجاوز طول الحقل %s',
+    )
+    add(
+        '不是有效数字',
+        'Not a valid number',
+        'No es un número válido',
+        'Pas un nombre valide',
+        'ليست رقمًا صالحًا',
+    )
+    add(
+        '超出整数范围',
+        'Outside integer range',
+        'Fuera del rango entero',
+        'Hors de la plage entière',
+        'خارج نطاق الأعداد الصحيحة',
+    )
+    add(
+        '不是数字',
+        'Not a number',
+        'No es un número',
+        'Pas un nombre',
+        'ليست رقمًا',
+    )
     return rows
 
 

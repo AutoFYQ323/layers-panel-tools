@@ -32,6 +32,10 @@ _TAGS = (
 
 _INDICATORS = {}
 _HOOKED = False
+_IFACE = [None]
+_ON_PROJECT = [None]
+_ON_ADDED = [None]
+_HOOKED_ROOT = [None]
 
 
 def tag_of(layer):
@@ -98,19 +102,107 @@ def make_menu_action(iface):
     )
 
 
-_HOOKED_ROOT = [None]
+def _on_project_signal(*_args):
+    """Project cleared/read: rebind only while the plugin is still loaded."""
+    if not _HOOKED:
+        return
+    iface = _IFACE[0]
+    if iface is None:
+        return
+    _rebind(iface)
+
+
+def _on_added_children(*_args):
+    if not _HOOKED:
+        return
+    iface = _IFACE[0]
+    if iface is None:
+        return
+    try:
+        refresh_indicators(iface)
+    except Exception:
+        pass  # nosec
+
+
+def _disconnect_root():
+    root = _HOOKED_ROOT[0]
+    slot = _ON_ADDED[0]
+    _HOOKED_ROOT[0] = None
+    _ON_ADDED[0] = None
+    if root is None or slot is None:
+        return
+    try:
+        root.addedChildren.disconnect(slot)
+    except Exception:
+        pass  # nosec
+
+
+def _clear_indicators(iface):
+    view = None
+    if iface is not None:
+        try:
+            view = iface.layerTreeView()
+        except Exception:
+            view = None
+    root = None
+    try:
+        root = QgsProject.instance().layerTreeRoot()
+    except Exception:
+        root = None
+    for layer_id, indicator in list(_INDICATORS.items()):
+        if view is not None and root is not None and indicator is not None:
+            try:
+                node = root.findLayer(layer_id)
+            except Exception:
+                node = None
+            if node is not None:
+                try:
+                    view.removeIndicator(node, indicator)
+                except Exception:
+                    pass  # nosec
+        _INDICATORS.pop(layer_id, None)
+    _INDICATORS.clear()
+
+
+def close_layer_tags():
+    """Unload: drop project/root slots so QGIS exit cannot call into a dead plugin."""
+    global _HOOKED
+    _HOOKED = False
+    iface = _IFACE[0]
+    _IFACE[0] = None
+    slot = _ON_PROJECT[0]
+    _ON_PROJECT[0] = None
+    if slot is not None:
+        try:
+            project = QgsProject.instance()
+        except Exception:
+            project = None
+        if project is not None:
+            for signal_name in ("readProject", "cleared"):
+                try:
+                    getattr(project, signal_name).disconnect(slot)
+                except Exception:
+                    pass  # nosec
+    _disconnect_root()
+    try:
+        _clear_indicators(iface)
+    except Exception:
+        pass  # nosec
 
 
 def _hook(iface):
     global _HOOKED
+    _IFACE[0] = iface
     first = not _HOOKED
     _HOOKED = True
     if first:
         project = QgsProject.instance()
         # 打开工程文件走 readProject；新建空白工程只发 cleared，不发 readProject。
+        # Named slot so unload can disconnect (lambdas cannot be disconnected safely).
+        _ON_PROJECT[0] = _on_project_signal
         for signal_name in ("readProject", "cleared"):
             try:
-                getattr(project, signal_name).connect(lambda *_a: _rebind(iface))
+                getattr(project, signal_name).connect(_on_project_signal)
             except Exception:
                 pass  # nosec
     _rebind(iface)
@@ -118,22 +210,31 @@ def _hook(iface):
 
 def _rebind(iface):
     """把 addedChildren 挂到当前工程的 root 上。工程切换后 root 会换，旧连接不再有效。"""
+    if not _HOOKED or iface is None:
+        return
     try:
         root = QgsProject.instance().layerTreeRoot()
     except Exception:
         return
-    if root is None or root is _HOOKED_ROOT[0]:
+    if root is None:
+        return
+    if root is _HOOKED_ROOT[0]:
         _after_bind(iface)
         return
+    _disconnect_root()
+    _ON_ADDED[0] = _on_added_children
     try:
-        root.addedChildren.connect(lambda *_args: refresh_indicators(iface))
+        root.addedChildren.connect(_on_added_children)
     except Exception:
-        pass  # nosec
+        _ON_ADDED[0] = None
+        return
     _HOOKED_ROOT[0] = root
     _after_bind(iface)
 
 
 def _after_bind(iface):
+    if not _HOOKED or iface is None:
+        return
     try:
         refresh_indicators(iface)
     except Exception:
@@ -142,6 +243,8 @@ def _after_bind(iface):
 
 def refresh_indicators(iface):
     """Re-create panel indicators from saved tags (project reopened, layers added)."""
+    if not _HOOKED or iface is None:
+        return
     try:
         from qgis.gui import QgsLayerTreeViewIndicator
     except ImportError:

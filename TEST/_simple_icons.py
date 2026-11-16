@@ -274,6 +274,30 @@ def class_export():
     _finish(im, "class_export")
 
 
+def line_dir():
+    im, d = new()
+    d.line([(10, 48), (28, 20), (46, 36), (54, 12)], fill=BLUE, width=5)
+    d.polygon([(50, 8), (58, 14), (52, 20)], fill=ORANGE)
+    d.ellipse((6, 42, 18, 54), fill=GREEN)
+    _finish(im, "line_dir")
+
+
+def quick_classify():
+    im, d = new()
+    d.rounded_rectangle((10, 10, 54, 26), radius=3, fill=BLUE)
+    d.rounded_rectangle((10, 30, 54, 40), radius=3, fill=GREEN)
+    d.rounded_rectangle((10, 44, 54, 54), radius=3, fill=ORANGE)
+    _finish(im, "quick_classify")
+
+
+def multiline():
+    im, d = new()
+    for xy, c in (((12, 40), GREEN), ((32, 16), BLUE), ((50, 44), ORANGE)):
+        d.ellipse((xy[0] - 6, xy[1] - 6, xy[0] + 6, xy[1] + 6), fill=c)
+    d.line([(12, 40), (32, 16), (50, 44)], fill=PURPLE, width=4)
+    _finish(im, "multiline")
+
+
 def main():
     for fn in (
         organize,
@@ -305,6 +329,9 @@ def main():
         layer_ops,
         line_ends,
         class_export,
+        multiline,
+        line_dir,
+        quick_classify,
     ):
         fn()
 

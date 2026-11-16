@@ -29,6 +29,8 @@ KEYS = {
     "flash_interval": ("flash locate", False, "last flicker interval, convenience only"),
     "menu_context": ("layer context menu", True, "right-click order, hidden items, custom titles, added tools, toolbar_hidden, toolbar_proxies"),
     "multiline": ("multi-point draw line", False, "dialog options for multi-point draw line"),
+    "line_dir_free": ("line direction check", False, "remembered start/line/end layers for free-start check"),
+    "line_dir_tolerance": ("line direction check", False, "endpoint snap tolerance in metres"),
 }
 
 # Convenience keys: losing them costs nothing; reset clears them too.

@@ -28,6 +28,8 @@ from .layer_ops import make_action as layer_ops_action
 from .line_ends import make_action as line_ends_action
 from .class_export import make_action as class_export_action
 from .multiline_tool import make_action as multiline_action
+from .line_dir_tool import make_action as line_dir_action
+from .quick_classify import make_action as quick_classify_action
 
 
 def extra_actions(iface):
@@ -48,6 +50,8 @@ def extra_actions(iface):
         line_ends_action(iface),
         class_export_action(iface),
         multiline_action(iface),
+        line_dir_action(iface),
+        quick_classify_action(iface),
         organize_action(iface),
         repair_action(iface),
         find_action(iface),
