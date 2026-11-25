@@ -5,9 +5,17 @@ SETTINGS_ID = "lpt:settings"
 SEP_PREFIX = "lpt:sep:"
 MAX_ROWS = 10
 # 首次安装和「恢复默认」时不勾选。默认勾选的按钮不在这张表里：
-# 标注、批量选择图层、图层管理、编辑记录、批量导出、按多边形选择、底图切换、图层开关、
-# 独显图层、闪烁定位、图层操作、线标注、分类导出。
+# 标注、图层管理、编辑记录、批量导出、按多边形选择、要素数、图层开关、
+# 闪烁定位、图层操作、分类导出。
+# 底图切换、批量选择图层、独显图层、线标注、自定义标注默认不勾选。
+# 已经保存过工具条的用户保持原勾选；这张表只作用于首次安装、恢复默认，
+# 以及存档里还没有的新按钮。
 DEFAULT_HIDDEN = (
+    "lpt:basemap",
+    "lpt:select",
+    "lpt:solo",
+    "lpt:line_ends",
+    "lpt:field_label",
     "lpt:multiline",
     "lpt:line_dir",
     "lpt:quick_classify",
@@ -29,19 +37,20 @@ DEFAULT_HIDDEN = (
 # 图层面板工具设置里列表顺序：先默认显示的插件按钮，再默认隐藏的，与 tools.extra_actions 一致。
 DEFAULT_PLUGIN_ORDER = (
     "lpt:labels",
-    "lpt:select",
     "lpt:layer_manager",
     "lpt:edit_timeline",
     "lpt:export",
     "lpt:poly_select",
     "lpt:feature_count",
     "lpt:switch",
-    "lpt:basemap",
-    "lpt:solo",
     "lpt:flash",
     "lpt:layer_ops",
-    "lpt:line_ends",
     "lpt:class_export",
+    "lpt:basemap",
+    "lpt:select",
+    "lpt:solo",
+    "lpt:line_ends",
+    "lpt:field_label",
     "lpt:multiline",
     "lpt:line_dir",
     "lpt:quick_classify",
@@ -234,6 +243,24 @@ def self_check():
     kept = merge_order(["lpt:labels", "tp:demo", "lpt:multiline"], {"lpt:labels", "lpt:multiline", "tp:demo"}, ["lpt:labels", "lpt:multiline"])
     assert kept == ["lpt:labels", "tp:demo", "lpt:multiline"]  # nosec
 
+    assert factory_row("lpt:basemap") == 3  # nosec
+    assert factory_row("lpt:select") == 3  # nosec
+    assert factory_row("lpt:solo") == 3  # nosec
+    assert factory_row("lpt:line_ends") == 3  # nosec
+    assert factory_row("lpt:field_label") == 3  # nosec
+    assert "lpt:field_label" in DEFAULT_HIDDEN  # nosec
+    assert "lpt:basemap" in DEFAULT_HIDDEN  # nosec
+    # A button the user already saved stays as they left it. A new id is off.
+    assert "lpt:basemap" not in hidden_for_load(  # nosec
+        ["lpt:basemap", "lpt:labels"],
+        [],
+        ["lpt:basemap", "lpt:labels", "lpt:field_label"],
+    )
+    assert "lpt:field_label" in hidden_for_load(  # nosec
+        ["lpt:basemap", "lpt:labels"],
+        [],
+        ["lpt:basemap", "lpt:labels", "lpt:field_label"],
+    )
     assert factory_row("lpt:multiline") == 3  # nosec
     assert sort_plugin_tools(["lpt:organize", "lpt:quick_classify", "lpt:line_dir", "lpt:multiline", "lpt:class_export"]) == [
         "lpt:class_export",

@@ -87,6 +87,7 @@ CANDIDATES = (
     ("lpt:poly_select", "按多边形选择"),
     ("lpt:switch", "图层开关"),
     ("lpt:basemap", "底图切换"),
+    ("lpt:field_label", "自定义标注"),
 )
 _CANDIDATE_IDS = {item[0]: item[1] for item in CANDIDATES}
 
@@ -111,7 +112,7 @@ def bind_host(host, iface=None):
         _IFACE = iface
 
 
-def _empty():
+def _empty_profile():
     return {
         "order": [],
         "hidden": [],
@@ -126,8 +127,16 @@ def _empty():
         "toolbar_hidden": [],
         "toolbar_proxies": [],
         "thirdparty_toolbar_hidden": [],
-        "toolbar_homes": {},
+        "seen": False,
+        "seen_keys": [],
+        "dropped": [],
     }
+
+
+def _empty():
+    profile = _empty_profile()
+    profile["toolbar_homes"] = {}
+    return profile
 
 
 def _group_palette_entry(index):
@@ -214,30 +223,61 @@ def _clean_membership(data, allowed):
     return found
 
 
-def load_menu():
-    try:
-        raw = plugin_qsettings().value(_KEY, "")
-    except Exception:
-        raw = ""
-    if raw in (None, ""):
-        return _empty()
-    if not isinstance(raw, str):
-        raw = str(raw)
-    try:
-        data = json.loads(raw)
-    except Exception:
-        return _empty()
-    if not isinstance(data, dict):
-        return _empty()
-    found = _empty()
+def _clean_homes(homes):
+    found = {}
+    if not isinstance(homes, dict):
+        return found
+    for key, value in homes.items():
+        if not isinstance(value, dict):
+            continue
+        name = str(value.get("name") or "")
+        if not name:
+            continue
+        found[str(key)] = {
+            "name": name,
+            "index": value.get("index", -1),
+            "before": str(value.get("before") or ""),
+        }
+    return found
+
+
+def _clean_pending(items):
+    found = []
+    seen = set()
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        plugin_id = str(item.get("plugin_id") or "")
+        label = str(item.get("label") or "")
+        if not plugin_id or not label:
+            continue
+        token = (plugin_id, str(item.get("object_name") or ""), label)
+        if token in seen:
+            continue
+        seen.add(token)
+        found.append(
+            {
+                "plugin_id": plugin_id,
+                "object_name": str(item.get("object_name") or ""),
+                "label": label,
+                "readd": bool(item.get("readd")),
+            }
+        )
+    return found
+
+
+def _clean_profile(data, allow_extra=True):
+    data = data if isinstance(data, dict) else {}
+    found = _empty_profile()
     found["order"] = [str(item) for item in data.get("order") or [] if str(item)]
     found["hidden"] = [str(item) for item in data.get("hidden") or [] if str(item)]
     titles = data.get("titles") if isinstance(data.get("titles"), dict) else {}
     labels = data.get("labels") if isinstance(data.get("labels"), dict) else {}
     found["titles"] = {str(key): str(value) for key, value in titles.items() if str(value or "").strip()}
     found["labels"] = {str(key): str(value) for key, value in labels.items() if str(value or "").strip()}
-    found["added"] = [str(item) for item in data.get("added") or [] if str(item) in _CANDIDATE_IDS]
-    found["thirdparty"] = _clean_thirdparty(data.get("thirdparty"))
+    if allow_extra:
+        found["added"] = [str(item) for item in data.get("added") or [] if str(item) in _CANDIDATE_IDS]
+        found["thirdparty"] = _clean_thirdparty(data.get("thirdparty"))
     found["groups"] = _clean_groups(data.get("groups"))
     allowed = set(found["order"]) | set(found["added"]) | {item["id"] for item in found["thirdparty"]} | {item["id"] for item in found["groups"]}
     for item in found["thirdparty"]:
@@ -246,66 +286,100 @@ def load_menu():
     for item in found["groups"]:
         if item["id"] not in found["order"]:
             found["order"].append(item["id"])
-    found["membership"] = _clean_membership(data.get("membership"), allowed)
+    for key in list(data.get("order") or []):
+        key = str(key)
+        if key.startswith("usep:") and key not in found["order"]:
+            found["order"].append(key)
+    found["membership"] = _clean_membership(data.get("membership"), allowed | {key for key in found["order"] if str(key).startswith("usep:")})
     group_ids = {item["id"] for item in found["groups"]}
-    found["collapsed"] = [
-        str(item) for item in data.get("collapsed") or [] if str(item) in group_ids
-    ]
+    found["collapsed"] = [str(item) for item in data.get("collapsed") or [] if str(item) in group_ids]
     found["group_colors"] = _clean_group_colors(data.get("group_colors"), group_ids)
     found["toolbar_hidden"] = [str(item) for item in data.get("toolbar_hidden") or [] if str(item)]
-    # Legacy key kept empty: third-party items never hang on the Layers panel toolbar.
     found["toolbar_proxies"] = []
     found["thirdparty_toolbar_hidden"] = [
         str(item) for item in data.get("thirdparty_toolbar_hidden") or [] if str(item).startswith("tp:")
     ]
-    homes = data.get("toolbar_homes") if isinstance(data.get("toolbar_homes"), dict) else {}
-    found["toolbar_homes"] = {}
-    for key, value in homes.items():
-        if not isinstance(value, dict):
-            continue
-        name = str(value.get("name") or "")
-        if not name:
-            continue
-        found["toolbar_homes"][str(key)] = {
-            "name": name,
-            "index": value.get("index", -1),
-            "before": str(value.get("before") or ""),
-        }
+    found["seen"] = bool(data.get("seen"))
+    found["seen_keys"] = [str(item) for item in data.get("seen_keys") or [] if str(item)]
+    found["dropped"] = [str(item) for item in data.get("dropped") or [] if str(item)]
     return found
 
 
+def _read_raw_menu():
+    try:
+        raw = plugin_qsettings().value(_KEY, "")
+    except Exception:
+        raw = ""
+    if raw in (None, ""):
+        return {}
+    if not isinstance(raw, str):
+        raw = str(raw)
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
 
-def save_menu(data):
-    order = [str(item) for item in data.get("order") or [] if str(item)]
-    allowed = set(order) | set(data.get("added") or [])
+
+def load_store():
+    """Layer menu and group menu are stored apart. Older saves were one mixed list."""
+    data = _read_raw_menu()
+    homes = _clean_homes(data.get("toolbar_homes"))
+    pending = _clean_pending(data.get("pending_restore"))
+    profiles = data.get("profiles") if isinstance(data.get("profiles"), dict) else None
+    if profiles is None:
+        layer = _clean_profile(data, allow_extra=True)
+        group = _empty_profile()
+    else:
+        layer = _clean_profile(profiles.get("layer"), allow_extra=True)
+        group = _clean_profile(profiles.get("group"), allow_extra=False)
+    # A saved hide stays a hide. pending_restore is only for a row the user
+    # removed, or a box they checked again, so that button can be put back.
+    return {"layer": layer, "group": group, "toolbar_homes": homes, "pending_restore": pending}
+
+
+def load_menu(kind="layer"):
+    store = load_store()
+    kind = "group" if kind == "group" else "layer"
+    profile = dict(store[kind])
+    profile["toolbar_homes"] = dict(store.get("toolbar_homes") or {})
+    return profile
+
+
+def _write_store(store):
+    global _THIRDPARTY_IDLE, _APPLIED_THIRDPARTY
+    _THIRDPARTY_IDLE = False
+    _APPLIED_THIRDPARTY = set()
     payload = {
-        "order": order,
-        "hidden": list(data.get("hidden") or []),
-        "titles": dict(data.get("titles") or {}),
-        "labels": dict(data.get("labels") or {}),
-        "added": [item for item in data.get("added") or [] if item in _CANDIDATE_IDS],
-        "thirdparty": _clean_thirdparty(data.get("thirdparty")),
-        "groups": _clean_groups(data.get("groups")),
-        "membership": _clean_membership(data.get("membership"), allowed | {item["id"] for item in _clean_thirdparty(data.get("thirdparty"))} | {item["id"] for item in _clean_groups(data.get("groups"))}),
-        "collapsed": [
-            str(item)
-            for item in data.get("collapsed") or []
-            if str(item) in {entry["id"] for entry in _clean_groups(data.get("groups"))}
-        ],
-        "group_colors": _clean_group_colors(
-            data.get("group_colors"),
-            {entry["id"] for entry in _clean_groups(data.get("groups"))},
-        ),
-        "toolbar_hidden": [str(item) for item in data.get("toolbar_hidden") or [] if str(item)],
-        "toolbar_proxies": [],
-        "thirdparty_toolbar_hidden": [
-            str(item) for item in data.get("thirdparty_toolbar_hidden") or [] if str(item).startswith("tp:")
-        ],
-        "toolbar_homes": shared_toolbar.dump_homes() or dict(data.get("toolbar_homes") or {}),
+        "profiles": {
+            "layer": store.get("layer") or _empty_profile(),
+            "group": store.get("group") or _empty_profile(),
+        },
+        "toolbar_homes": store.get("toolbar_homes") or {},
+        "pending_restore": _clean_pending(store.get("pending_restore")),
     }
     settings = plugin_qsettings()
     settings.setValue(_KEY, json.dumps(payload, ensure_ascii=False))
     flush()
+
+
+def save_menu(data, kind="layer"):
+    kind = "group" if kind == "group" else "layer"
+    store = load_store()
+    packed = _clean_profile(data or {}, allow_extra=(kind == "layer"))
+    if kind == "layer" and isinstance(data, dict) and "thirdparty_toolbar_hidden" not in data:
+        packed["thirdparty_toolbar_hidden"] = list(store["layer"].get("thirdparty_toolbar_hidden") or [])
+    store[kind] = packed
+    homes = _clean_homes((data or {}).get("toolbar_homes") if isinstance(data, dict) else {})
+    try:
+        dumped = shared_toolbar.dump_homes()
+    except Exception:
+        dumped = None
+    if dumped:
+        homes = _clean_homes(dumped)
+    if homes:
+        store["toolbar_homes"] = homes
+    _write_store(store)
 
 
 def _clean_text(text):
@@ -377,27 +451,106 @@ def describe_menu(menu):
     return found
 
 
-def _remember(pairs, refresh_labels):
-    data = load_menu()
-    changed = False
-    known = set(data["order"])
-    for key, label, _separator in pairs:
+def _menu_kind(iface):
+    """Which right-click is open: a layer node, or a group node."""
+    node = None
+    try:
+        view = iface.layerTreeView() if iface is not None else None
+        node = view.currentNode() if view is not None else None
+    except Exception:
+        node = None
+    if node is None:
+        return "layer"
+    try:
+        from qgis.core import QgsLayerTree
+
+        if QgsLayerTree.isGroup(node):
+            return "group"
+        if QgsLayerTree.isLayer(node):
+            return "layer"
+    except Exception:
+        pass  # nosec
+    try:
+        from qgis.core import QgsLayerTreeNode
+
+        group_type = getattr(QgsLayerTreeNode, "NodeGroup", None)
+        if group_type is None:
+            nested = getattr(QgsLayerTreeNode, "NodeType", None)
+            group_type = getattr(nested, "NodeGroup", None) if nested is not None else None
+        if group_type is not None and node.nodeType() == group_type:
+            return "group"
+    except Exception:
+        pass  # nosec
+    return "layer"
+
+
+def _copy_menu_fields(src, dst, keys):
+    hidden = set(src.get("hidden") or [])
+    for key in keys:
+        if key in hidden and key not in dst["hidden"]:
+            dst["hidden"].append(key)
+        title = str((src.get("titles") or {}).get(key) or "").strip()
+        if title and not str(dst["titles"].get(key) or "").strip():
+            dst["titles"][key] = title
+        label = str((src.get("labels") or {}).get(key) or "").strip()
+        if label and not str(dst["labels"].get(key) or "").strip():
+            dst["labels"][key] = label
+
+
+def _remember(pairs, refresh_labels=False, kind="layer"):
+    """Record this menu's native items on the layer page or the group page, not both."""
+    kind = "group" if kind == "group" else "layer"
+    store = load_store()
+    profile = store[kind]
+    dropped = set(profile.get("dropped") or [])
+    described = []
+    labels = {}
+    for key, label, _separator in pairs or []:
+        key = str(key or "")
+        if not key or key in dropped:
+            continue
+        described.append(key)
+        if label:
+            labels[key] = label
+    if kind == "group" and not profile.get("seen"):
+        layer = store["layer"]
+        menu_set = set(described)
+        seeded = []
+        for key in layer.get("order") or []:
+            if key in menu_set and (_is_menu_native_key(key) or str(key).startswith("sep:")):
+                seeded.append(key)
+        for key in described:
+            if key not in seeded:
+                seeded.append(key)
+        for key in profile.get("order") or []:
+            if key in seeded:
+                continue
+            if str(key).startswith("usep:") or str(key).startswith("grp:"):
+                seeded.append(key)
+        profile["order"] = seeded
+        _copy_menu_fields(layer, profile, seeded)
+    known = set(profile.get("order") or [])
+    for key in described:
         if key not in known:
-            data["order"].append(key)
+            profile["order"].append(key)
             known.add(key)
-            changed = True
-        if not label:
+    seen = set(profile.get("seen_keys") or [])
+    for key in described:
+        seen.add(key)
+    profile["seen_keys"] = list(seen)
+    profile["seen"] = True
+    for key, label in labels.items():
+        saved_title = str(profile["titles"].get(key) or "").strip()
+        if saved_title and label == saved_title and profile["labels"].get(key):
             continue
-        saved_title = str(data["titles"].get(key) or "").strip()
-        if saved_title and label == saved_title and data["labels"].get(key):
-            continue
-        if refresh_labels or key not in data["labels"]:
-            if data["labels"].get(key) != label:
-                data["labels"][key] = label
-                changed = True
-    if changed:
-        save_menu(data)
-    return data
+        if refresh_labels or key not in profile["labels"]:
+            if profile["labels"].get(key) != label:
+                profile["labels"][key] = label
+    store[kind] = profile
+    _write_store(store)
+    result = dict(profile)
+    result["toolbar_homes"] = dict(store.get("toolbar_homes") or {})
+    return result
 
 
 def snapshot(iface):
@@ -428,6 +581,80 @@ def snapshot(iface):
             menu.deleteLater()
         except Exception:
             pass  # nosec
+
+
+def _node_is_group(node):
+    if node is None:
+        return False
+    try:
+        from qgis.core import QgsLayerTree
+
+        if QgsLayerTree.isGroup(node):
+            return True
+        if QgsLayerTree.isLayer(node):
+            return False
+    except Exception:
+        pass  # nosec
+    try:
+        return int(node.nodeType()) == int(node.NodeGroup)
+    except Exception:
+        return False
+
+
+def _find_menu_node(root, kind):
+    """A real layer, or a group that is not the project root."""
+    if root is None:
+        return None
+    pending = list(root.children())
+    while pending:
+        node = pending.pop(0)
+        if kind == "group":
+            if _node_is_group(node):
+                return node
+        elif not _node_is_group(node):
+            return node
+        try:
+            pending.extend(list(node.children()))
+        except Exception:
+            pass  # nosec
+    return None
+
+
+def snapshot_for(iface, kind):
+    """Read that side's menu even when the current node is the other kind."""
+    if iface is None:
+        return []
+    try:
+        view = iface.layerTreeView()
+    except Exception:
+        view = None
+    if view is None:
+        return []
+    try:
+        current = view.currentIndex()
+    except Exception:
+        current = None
+    if _menu_kind(iface) == kind:
+        return snapshot(iface)
+    try:
+        root = view.layerTreeModel().rootGroup()
+    except Exception:
+        root = None
+    node = _find_menu_node(root, kind)
+    if node is None:
+        return []
+    try:
+        view.setCurrentIndex(view.node2index(node))
+    except Exception:
+        return []
+    try:
+        return snapshot(iface)
+    finally:
+        if current is not None and current.isValid():
+            try:
+                view.setCurrentIndex(current)
+            except Exception:
+                pass  # nosec
 
 
 def _is_menu_native_key(key):
@@ -644,6 +871,16 @@ def _native_menu_proxy(menu, action, title):
         proxy.setStatusTip(action.statusTip())
     except Exception:
         pass  # nosec
+    source_menu = None
+    try:
+        source_menu = action.menu()
+    except Exception:
+        source_menu = None
+    if source_menu is not None:
+        box = QMenu(menu)
+        box.aboutToShow.connect(lambda box=box, source=source_menu: _mirror_native_menu(box, source))
+        proxy.setMenu(box)
+        return proxy
 
     def fire(_checked=False, src=action):
         try:
@@ -653,6 +890,64 @@ def _native_menu_proxy(menu, action, title):
 
     proxy.triggered.connect(fire)
     return proxy
+
+
+def _mirror_native_menu(box, source):
+    """Copy a QGIS submenu onto the proxy without taking its actions away."""
+    if box is None or source is None or box is source:
+        return
+    box.clear()
+    try:
+        source.aboutToShow.emit()
+    except Exception:
+        pass  # nosec
+    try:
+        actions = list(source.actions())
+    except Exception:
+        actions = []
+    for action in actions:
+        if action is None:
+            continue
+        try:
+            if action.isSeparator():
+                box.addSeparator()
+                continue
+        except Exception:
+            pass  # nosec
+        nested = None
+        try:
+            nested = action.menu()
+        except Exception:
+            nested = None
+        if nested is not None:
+            child = _native_menu_proxy(box, action, action.text())
+            box.addAction(child)
+            continue
+        text = ""
+        try:
+            text = action.text() or ""
+        except Exception:
+            text = ""
+        try:
+            icon = action.icon()
+        except Exception:
+            icon = None
+        proxy = QAction(icon, text, box) if icon is not None else QAction(text, box)
+        try:
+            proxy.setCheckable(action.isCheckable())
+            proxy.setChecked(action.isChecked())
+            proxy.setEnabled(action.isEnabled())
+        except Exception:
+            pass  # nosec
+
+        def fire(_checked=False, src=action):
+            try:
+                src.trigger()
+            except Exception:
+                pass  # nosec
+
+        proxy.triggered.connect(fire)
+        box.addAction(proxy)
 
 
 def _action_on_main_toolbars(iface, action):
@@ -678,39 +973,157 @@ def _action_on_main_toolbars(iface, action):
     return False
 
 
+_THIRDPARTY_IDLE = False
+_APPLIED_THIRDPARTY = set()
+
+
+def _thirdparty_token(entry):
+    return (
+        str((entry or {}).get("plugin_id") or ""),
+        str((entry or {}).get("object_name") or ""),
+        str((entry or {}).get("label") or ""),
+    )
+
+
+def _put_thirdparty_visible(iface, action, put_back):
+    """Show the original action. put_back adds a toolbar icon only after we removed one."""
+    try:
+        if action is not None and not action.isVisible():
+            action.setVisible(True)
+    except Exception:
+        pass  # nosec
+    if not put_back or iface is None or action is None:
+        return True
+    if _action_on_main_toolbars(iface, action):
+        return True
+    try:
+        iface.addToolBarIcon(action)
+    except Exception:
+        return False
+    return True
+
+
+def restore_thirdparty_actions(iface, data=None):
+    """Re-apply saved third-party toolbar checks once those actions exist."""
+    if _THIRDPARTY_IDLE:
+        return
+    apply_thirdparty_original_visibility(iface, data, restore_all=False)
+
+
 def apply_thirdparty_original_visibility(iface, data=None, restore_all=False):
-    """Show/hide original third-party plugin actions (PROC-style), not only our Layers proxy."""
-    if data is None:
-        data = load_menu()
-    hidden = set() if restore_all else set(str(item) for item in (data.get("thirdparty_toolbar_hidden") or []))
-    for entry in data.get("thirdparty") or []:
+    """Show or hide original third-party toolbar buttons, PROC-style.
+
+    Unchecked: setVisible(False) and removeToolBarIcon.
+    Checked: setVisible(True). addToolBarIcon only for a button this plugin
+    removed (pending_restore, or restore_all for ids still marked hidden).
+    Menu-only actions that were never removed are not added to the toolbar.
+    restore_all runs on unload and on the layer page reset.
+    """
+    global _THIRDPARTY_IDLE, _APPLIED_THIRDPARTY
+    store = load_store()
+    profile = store["layer"] if not isinstance(data, dict) else data
+    if restore_all:
+        _APPLIED_THIRDPARTY = set()
+    saved_hidden = {
+        str(item)
+        for item in (profile.get("thirdparty_toolbar_hidden") or [])
+        if str(item).startswith("tp:")
+    }
+    hidden_now = set() if restore_all else set(saved_hidden)
+    pending = list(store.get("pending_restore") or [])
+    original_pending = _clean_pending(pending)
+    if restore_all:
+        for entry in profile.get("thirdparty") or []:
+            if not isinstance(entry, dict) or entry.get("kind") != "plugin_action":
+                continue
+            if str(entry.get("id") or "") not in saved_hidden:
+                continue
+            pending.append(
+                {
+                    "plugin_id": entry.get("plugin_id") or "",
+                    "object_name": entry.get("object_name") or "",
+                    "label": entry.get("label") or "",
+                    "readd": True,
+                }
+            )
+        pending = _clean_pending(pending)
+    try:
+        from .menu_extras import find_plugin_action
+    except Exception:
+        find_plugin_action = None
+    has_work = bool(profile.get("thirdparty") or pending)
+    missing = find_plugin_action is None and has_work
+    applied = set() if restore_all else set(_APPLIED_THIRDPARTY)
+    for entry in profile.get("thirdparty") or []:
         if not isinstance(entry, dict) or entry.get("kind") != "plugin_action":
             continue
-        key = str(entry.get("id") or "")
-        action = None
-        try:
-            from .menu_extras import find_plugin_action
-
-            action = find_plugin_action(entry)
-        except Exception:
-            action = None
+        action = find_plugin_action(entry) if find_plugin_action is not None else None
         if action is None:
+            missing = True
             continue
-        show = key not in hidden
+        token = _thirdparty_token(entry)
+        want_hide = str(entry.get("id") or "") in hidden_now
         try:
-            action.setVisible(show)
+            shown = bool(action.isVisible())
         except Exception:
-            pass  # nosec
-        if iface is None:
+            shown = not want_hide
+        mark = (token, "hide" if want_hide else "show")
+        if mark in applied and shown == (not want_hide):
             continue
+        if want_hide:
+            try:
+                action.setVisible(False)
+            except Exception:
+                pass  # nosec
+            if iface is not None:
+                try:
+                    iface.removeToolBarIcon(action)
+                except Exception:
+                    pass  # nosec
+            applied.add(mark)
+            continue
+        if not _put_thirdparty_visible(iface, action, False):
+            missing = True
+            continue
+        applied.add(mark)
+    still = []
+    for item in pending:
+        entry = {
+            "kind": "plugin_action",
+            "plugin_id": item.get("plugin_id") or "",
+            "object_name": item.get("object_name") or "",
+            "label": item.get("label") or "",
+        }
+        action = find_plugin_action(entry) if find_plugin_action is not None else None
+        if action is None:
+            still.append(item)
+            missing = True
+            continue
+        mark = (_thirdparty_token(item), "readd" if item.get("readd") else "show")
         try:
-            if show:
-                if not _action_on_main_toolbars(iface, action):
-                    iface.addToolBarIcon(action)
-            else:
-                iface.removeToolBarIcon(action)
+            shown = bool(action.isVisible())
         except Exception:
-            pass  # nosec
+            shown = False
+        on_bar = True if not item.get("readd") else _action_on_main_toolbars(iface, action)
+        if mark in applied and shown and on_bar:
+            continue
+        if not _put_thirdparty_visible(iface, action, bool(item.get("readd"))):
+            still.append(item)
+            missing = True
+            continue
+        applied.add(mark)
+    if restore_all:
+        original_tokens = {_thirdparty_token(item) for item in original_pending}
+        still = [item for item in still if _thirdparty_token(item) in original_tokens]
+    cleaned = _clean_pending(still)
+    if cleaned != original_pending:
+        store["pending_restore"] = cleaned
+        _write_store(store)
+    _APPLIED_THIRDPARTY = applied
+    if not missing and not cleaned:
+        _THIRDPARTY_IDLE = True
+    else:
+        _THIRDPARTY_IDLE = False
 
 
 def apply_system_side_effects(iface, data=None, restore_toolbars=False):
@@ -730,7 +1143,7 @@ def apply_system_side_effects(iface, data=None, restore_toolbars=False):
             pass  # nosec
 
 
-def apply_menu(menu, iface):
+def apply_menu(menu, iface, kind=None):
     """QGIS 生成菜单之后调用：重排、改名、隐藏，再插入用户加进来的功能。"""
     if menu is None:
         return
@@ -787,7 +1200,10 @@ def apply_menu(menu, iface):
         by_key[key] = action
         actions.append(action)
 
-    data = _remember([(key, label, sep) for key, label, sep in described], refresh_labels=False)
+    if kind is None:
+        kind = _menu_kind(iface)
+    kind = "group" if kind == "group" else "layer"
+    data = _remember([(key, label, sep) for key, label, sep in described], refresh_labels=False, kind=kind)
     # Restore titles only. Never apply_membership on the right-click hot path —
     # scanning/rewriting main-window toolbars here made Layer Properties lag for seconds.
     for key, action in by_key.items():
@@ -797,14 +1213,18 @@ def apply_menu(menu, iface):
     hidden = set(data["hidden"])
 
     titles = data["titles"]
-    added = [item for item in data["added"] if item in _CANDIDATE_IDS]
-    thirdparty = {item["id"]: item for item in data.get("thirdparty") or []}
+    added = [] if kind == "group" else [item for item in data["added"] if item in _CANDIDATE_IDS]
+    thirdparty = {} if kind == "group" else {item["id"]: item for item in data.get("thirdparty") or []}
     groups = {item["id"]: item for item in data.get("groups") or []}
     membership = dict(data.get("membership") or {})
+    dropped = set(data.get("dropped") or [])
     present = set(by_key) | set(added) | set(thirdparty) | set(groups)
-    order = [key for key in data["order"] if key in present]
+    for key in data["order"]:
+        if str(key).startswith("usep:"):
+            present.add(key)
+    order = [key for key in data["order"] if key in present and key not in dropped]
     for key in by_key:
-        if key not in order:
+        if key not in order and key not in dropped:
             order.append(key)
     for key in added:
         if key not in order:
@@ -864,6 +1284,17 @@ def apply_menu(menu, iface):
 
     for key in order:
         if membership.get(key):
+            continue
+        if str(key).startswith("usep:"):
+            if key in hidden:
+                continue
+            sep = QAction(menu)
+            sep.setSeparator(True)
+            sep.setProperty("lpt_ctx_id", key)
+            try:
+                menu.addAction(sep)
+            except Exception:
+                pass  # nosec
             continue
         if key in groups:
             members = [item for item in order if membership.get(item) == key and item not in hidden and item in present]
@@ -989,7 +1420,7 @@ class ContextMenus:
             pass  # nosec
 
     def _on_menu(self, menu):
-        apply_menu(menu, self.iface)
+        apply_menu(menu, self.iface, _menu_kind(self.iface))
 
 
 class _StillCombo(QComboBox):
@@ -1333,9 +1764,10 @@ class _MenuList(QListWidget):
 
 
 class MenuSettingsPage(QWidget):
-    def __init__(self, iface, parent=None):
+    def __init__(self, iface, parent=None, kind="layer"):
         super().__init__(parent)
         self.iface = iface
+        self._kind = "group" if kind == "group" else "layer"
         self._filling = False
         self._loaded = False
         self._labels_cache = {}
@@ -1390,6 +1822,15 @@ class MenuSettingsPage(QWidget):
         move_row.addWidget(self.btn_down, 1)
         right_layout.addLayout(move_row)
 
+        self.btn_sep = _WrapButton()
+        self.btn_sep_del = _WrapButton()
+        sep_row = QHBoxLayout()
+        sep_row.setContentsMargins(0, 0, 0, 0)
+        sep_row.setSpacing(8)
+        sep_row.addWidget(self.btn_sep, 1)
+        sep_row.addWidget(self.btn_sep_del, 1)
+        right_layout.addLayout(sep_row)
+
         self.add_label = QLabel()
         self.add_label.setWordWrap(True)
         self.add_combo = _StillCombo()
@@ -1419,6 +1860,8 @@ class MenuSettingsPage(QWidget):
         right_layout.addWidget(self.btn_group_color)
 
         right_layout.addStretch(1)
+        self.btn_reload = _WrapButton()
+        right_layout.addWidget(self.btn_reload)
         self.btn_reset = _WrapButton()
         right_layout.addWidget(self.btn_reset)
 
@@ -1430,6 +1873,9 @@ class MenuSettingsPage(QWidget):
         self.title_edit.textChanged.connect(self._on_title)
         self.btn_up.clicked.connect(lambda: self._move(-1))
         self.btn_down.clicked.connect(lambda: self._move(1))
+        self.btn_sep.clicked.connect(self._insert_sep)
+        self.btn_sep_del.clicked.connect(self._delete_sep)
+        self.btn_reload.clicked.connect(self._reload_menu)
         self.btn_reset.clicked.connect(self._reset)
         self.btn_add.clicked.connect(self._add)
         self.btn_remove.clicked.connect(self._remove)
@@ -1460,14 +1906,39 @@ class MenuSettingsPage(QWidget):
         self.title_label.setText(tr("自定义名称"))
         self.title_label.setWordWrap(True)
         self.title_edit.setPlaceholderText(tr("留空使用原名"))
+        self.btn_reload.setText(tr("重新载入"))
+        self.btn_reload.setToolTip(tr("按当前工程重新读取这一侧的右键菜单。已有的顺序和分组保留，缺的项会补上。"))
         self.btn_reset.setText(tr("恢复默认"))
-        self.btn_reset.setToolTip(tr("只恢复图层右键菜单，并把从主窗口原工具栏拿掉的按钮加回去。本插件工具栏上其它按钮不动；已挂上的第三方代理会撤掉。"))
+        if self._kind == "group":
+            self.btn_reset.setToolTip(tr("只恢复组的右键菜单。"))
+        else:
+            self.btn_reset.setToolTip(tr("只恢复图层右键菜单，并把从主窗口原工具栏拿掉的按钮加回去。本插件工具栏上其它按钮不动；已挂上的第三方代理会撤掉。"))
         self.btn_up.setText(tr("上移"))
         self.btn_down.setText(tr("下移"))
-        self.add_label.setText(tr("添加功能"))
-        self.btn_add.setText(tr("添加"))
-        self.btn_remove.setText(tr("移除"))
-        self.btn_third.setText(tr("添加第三方功能"))
+        self.btn_sep.setText(tr("增加分割线"))
+        self.btn_sep_del.setText(tr("删除分割线"))
+        if self._kind == "group":
+            self.add_label.setText("")
+            self.add_combo.clear()
+            self.add_combo.setEnabled(False)
+            self.btn_add.setText("")
+            self.btn_add.setEnabled(False)
+            self.btn_add.setFlat(True)
+            self.btn_remove.setText("")
+            self.btn_remove.setEnabled(False)
+            self.btn_remove.setFlat(True)
+            self.btn_third.setText("")
+            self.btn_third.setEnabled(False)
+            self.btn_third.setFlat(True)
+        else:
+            self.add_label.setText(tr("添加功能"))
+            self.btn_add.setText(tr("添加"))
+            self.btn_remove.setText(tr("移除"))
+            self.btn_third.setText(tr("添加第三方功能"))
+            self.btn_add.setFlat(False)
+            self.btn_remove.setFlat(False)
+            self.btn_third.setFlat(False)
+            self.add_combo.setEnabled(True)
         self.btn_new_group.setText(tr("新建组"))
         self.btn_rename_group.setText(tr("重命名组"))
         self.btn_delete_group.setText(tr("删除组"))
@@ -1489,6 +1960,7 @@ class MenuSettingsPage(QWidget):
             self.btn_rename_group,
             self.btn_delete_group,
             self.btn_group_color,
+            self.btn_reload,
             self.btn_reset,
         ):
             button.updateGeometry()
@@ -1509,7 +1981,7 @@ class MenuSettingsPage(QWidget):
     def commit(self):
         if not self._loaded:
             return
-        previous = load_menu()
+        previous = load_menu(self._kind)
         order = []
         hidden = []
         titles = {}
@@ -1542,8 +2014,6 @@ class MenuSettingsPage(QWidget):
                     entry = dict(entry)
                     entry["id"] = key
                     thirdparty.append(entry)
-                    # Toolbar checkbox only toggles the plugin's original top toolbar icon
-                    # (PROC-style). Never hang a proxy on this plugin's Layers panel toolbar.
                     if entry.get("kind") == "plugin_action" and not bar_on:
                         thirdparty_toolbar_hidden.append(key)
             if kind == "group":
@@ -1586,12 +2056,74 @@ class MenuSettingsPage(QWidget):
         # Drop any legacy Layers-panel third-party proxies; Layers toolbar is only
         # controlled by this plugin's own toolbar settings page.
         data["toolbar_proxies"] = []
-        data["thirdparty_toolbar_hidden"] = thirdparty_toolbar_hidden
+        if self._kind == "layer":
+            new_ids = {str(entry.get("id") or "") for entry in thirdparty}
+            old_map = {str(entry.get("id") or ""): entry for entry in previous.get("thirdparty") or []}
+            hidden_old = set(previous.get("thirdparty_toolbar_hidden") or [])
+            shown_now = set(new_ids) - set(thirdparty_toolbar_hidden)
+            pending_extra = []
+            seen_pending = set()
+
+            def _queue_restore(entry):
+                plugin_id = str(entry.get("plugin_id") or "")
+                label = str(entry.get("label") or "")
+                token = (plugin_id, str(entry.get("object_name") or ""), label)
+                if not plugin_id or not label or token in seen_pending:
+                    return
+                seen_pending.add(token)
+                pending_extra.append(
+                    {
+                        "plugin_id": plugin_id,
+                        "object_name": token[1],
+                        "label": label,
+                        "readd": True,
+                    }
+                )
+
+            for key, entry in old_map.items():
+                if entry.get("kind") != "plugin_action" or key in new_ids or key not in hidden_old:
+                    continue
+                _queue_restore(entry)
+            for entry in thirdparty:
+                key = str(entry.get("id") or "")
+                if entry.get("kind") != "plugin_action" or key not in hidden_old or key not in shown_now:
+                    continue
+                _queue_restore(entry)
+            if pending_extra:
+                store = load_store()
+                store["pending_restore"] = _clean_pending(list(store.get("pending_restore") or []) + pending_extra)
+                _write_store(store)
+        data["thirdparty_toolbar_hidden"] = list(thirdparty_toolbar_hidden)
+        seen = set(previous.get("seen_keys") or [])
+        if previous.get("seen"):
+            ui_keys = set(order)
+            for key in previous.get("order") or []:
+                if key in ui_keys:
+                    continue
+                if _is_menu_native_key(key) or str(key).startswith("sep:"):
+                    if key not in seen:
+                        order.append(key)
+                        ui_keys.add(key)
+            data["order"] = order
+        old_seps = [key for key in (previous.get("order") or []) if str(key).startswith("sep:") or str(key).startswith("usep:")]
+        new_seps = {key for key in order if str(key).startswith("sep:") or str(key).startswith("usep:")}
+        dropped = [key for key in (previous.get("dropped") or []) if key not in new_seps]
+        for key in old_seps:
+            if key not in new_seps and key not in dropped:
+                dropped.append(key)
+        data["dropped"] = dropped
+        data["seen"] = bool(previous.get("seen"))
+        data["seen_keys"] = list(previous.get("seen_keys") or [])
         # Keep native labels that the blank page never showed.
         if not ui_natives and saved_natives:
             data["labels"] = dict(previous.get("labels") or {})
-        save_menu(data)
-        apply_system_side_effects(self.iface, data)
+        if self._kind == "group":
+            data["added"] = []
+            data["thirdparty"] = []
+            data["thirdparty_toolbar_hidden"] = []
+        save_menu(data, self._kind)
+        if self._kind == "layer":
+            apply_system_side_effects(self.iface, data)
 
     def _item_flags(self, checkable=True):
         flags = (
@@ -1602,16 +2134,15 @@ class MenuSettingsPage(QWidget):
         return flags
 
     def _item_is_dual(self, item, data=None):
-        """Writable toolbar checkbox: shared native actions and third-party plugin actions only."""
+        """Writable toolbar checkbox: shared native actions and third-party plugin actions."""
         kind = str(item.data(_KIND) or "") if item is not None else ""
         if kind == "thirdparty":
             entry = item.data(_EXTRA) or {}
-            # Toolbox algorithms have no top-toolbar button to toggle; Layers bar is separate.
             return str((entry or {}).get("kind") or "") == "plugin_action"
         if kind == "native":
             if data is None:
                 try:
-                    data = load_menu()
+                    data = load_menu(self._kind)
                 except Exception:
                     data = None
             return shared_toolbar.is_shared_key(self.iface, str(item.data(_ID) or ""), data)
@@ -1785,15 +2316,22 @@ class MenuSettingsPage(QWidget):
                 widget.set_name(self._row_display_name(item), group=(str(item.data(_KIND) or "") == "group"))
         self._apply_collapse_visibility()
 
+    def _show_key(self, key, kind, data):
+        if self._kind == "group" and kind in ("plugin", "thirdparty"):
+            return False
+        if not data.get("seen"):
+            return True
+        if kind in ("plugin", "thirdparty", "group") or str(key).startswith("usep:"):
+            return True
+        return key in set(data.get("seen_keys") or [])
+
     def _fill_list(self):
-        data = load_menu()
-        # Only when nothing was ever captured: try one silent snapshot so a first open
-        # is less often blank. Skip when we already have natives (keeps open fast).
-        if not any(_is_menu_native_key(key) for key in (data.get("order") or [])):
+        data = load_menu(self._kind)
+        if not data.get("seen"):
             try:
-                pairs = snapshot(self.iface)
+                pairs = snapshot_for(self.iface, self._kind)
                 if pairs:
-                    data = _remember(pairs, refresh_labels=True)
+                    data = _remember(pairs, refresh_labels=True, kind=self._kind)
             except Exception:
                 pass  # nosec
         self._labels_cache = dict(data.get("labels") or {})
@@ -1833,7 +2371,7 @@ class MenuSettingsPage(QWidget):
                 continue
             if key in _CANDIDATE_IDS:
                 kind = "plugin"
-            elif key.startswith("sep:"):
+            elif key.startswith("sep:") or key.startswith("usep:"):
                 kind = "sep"
             elif key in thirdparty:
                 kind = "thirdparty"
@@ -1842,6 +2380,8 @@ class MenuSettingsPage(QWidget):
             else:
                 kind = "native"
             if kind == "plugin" and key not in data["added"] and key not in data["order"]:
+                continue
+            if not self._show_key(key, kind, data):
                 continue
             item = QListWidgetItem()
             item.setData(_ID, key)
@@ -1856,7 +2396,7 @@ class MenuSettingsPage(QWidget):
             if kind == "thirdparty":
                 entry = thirdparty.get(key) or {}
                 if entry.get("kind") == "plugin_action":
-                    # Checked = original top toolbar visible (PROC-style). Never Layers bar.
+                    # Checked = original top toolbar visible. Default is checked.
                     bar_on = key not in set(data.get("thirdparty_toolbar_hidden") or [])
                 else:
                     bar_on = False
@@ -1923,7 +2463,7 @@ class MenuSettingsPage(QWidget):
             return str((entry or {}).get("label") or key)
         labels = getattr(self, "_labels_cache", None)
         if labels is None:
-            labels = dict(load_menu().get("labels") or {})
+            labels = dict(load_menu(self._kind).get("labels") or {})
             self._labels_cache = labels
         return labels.get(key) or key
 
@@ -1980,12 +2520,24 @@ class MenuSettingsPage(QWidget):
         self._show_title()
 
     def _reset(self):
-        data = _empty()
-        save_menu(data)
-        apply_system_side_effects(self.iface, data, restore_toolbars=True)
+        if self._kind == "layer":
+            previous = load_menu("layer")
+            apply_thirdparty_original_visibility(self.iface, previous, restore_all=True)
+            fresh = _empty_profile()
+            fresh["toolbar_homes"] = dict(previous.get("toolbar_homes") or {})
+            save_menu(fresh, "layer")
+            apply_system_side_effects(self.iface, load_menu("layer"), restore_toolbars=True)
+        else:
+            save_menu(_empty_profile(), "group")
         self.refresh()
 
     def _fill_combo(self):
+        if self._kind == "group":
+            self.add_combo.blockSignals(True)
+            self.add_combo.clear()
+            self.add_combo.blockSignals(False)
+            self.btn_add.setEnabled(False)
+            return
         present = set()
         for row in range(self.list.count()):
             present.add(str(self.list.item(row).data(_ID) or ""))
@@ -2014,10 +2566,119 @@ class MenuSettingsPage(QWidget):
         self.title_edit.setEnabled(editable)
         self.title_edit.setText(str(item.data(_TITLE) or "") if editable else "")
         self.title_edit.blockSignals(False)
-        self.btn_remove.setEnabled(plugin or third)
+        self.btn_remove.setEnabled((plugin or third) and self._kind == "layer")
+        self.btn_sep_del.setEnabled(kind == "sep")
         self.btn_delete_group.setEnabled(group)
         self.btn_rename_group.setEnabled(group)
         self.btn_group_color.setEnabled(group)
+
+    def _insert_sep(self):
+        existing = set()
+        for row in range(self.list.count()):
+            existing.add(str(self.list.item(row).data(_ID) or ""))
+        number = 1
+        while ("usep:%d" % number) in existing:
+            number += 1
+        cursor = self.list.currentRow()
+        self._make_item("usep:%d" % number, "sep", "")
+        if cursor < 0:
+            return
+        item = self.list.takeItem(self.list.count() - 1)
+        self.list.insertItem(cursor + 1, item)
+        self.list.setCurrentItem(item)
+        self._bind_row(item, True, False)
+        self._paint_item(item)
+
+    def _delete_sep(self):
+        item = self.list.currentItem()
+        if item is None or str(item.data(_KIND) or "") != "sep":
+            return
+        self.list.takeItem(self.list.row(item))
+        self._show_title()
+
+    def _reload_menu(self):
+        pairs = snapshot_for(self.iface, self._kind)
+        if not pairs:
+            if self._kind == "group":
+                text = tr("工程里还没有图层组，读不到组的右键菜单。")
+            else:
+                text = tr("工程里还没有图层，读不到图层右键菜单。")
+            report(self, tr("系统属性"), text, warning=True)
+            return
+        if self.list.count() == 0:
+            data = load_menu(self._kind)
+            data["seen"] = False
+            save_menu(data, self._kind)
+            self._loaded = False
+            self.ensure_loaded()
+            return
+        data = load_menu(self._kind)
+        labels = dict(data.get("labels") or {})
+        for key, label, _separator in pairs or []:
+            if key not in labels or not labels.get(key):
+                labels[key] = label
+        data["labels"] = labels
+        order = []
+        hidden = []
+        titles = {}
+        added = []
+        thirdparty = []
+        groups = []
+        membership = {}
+        toolbar_hidden = []
+        for row in range(self.list.count()):
+            item = self.list.item(row)
+            key = str(item.data(_ID) or "")
+            if not key:
+                continue
+            order.append(key)
+            kind = str(item.data(_KIND) or "")
+            right_on, bar_on = self._dual_state(item)
+            if not right_on:
+                hidden.append(key)
+            if kind == "native" and self._item_is_dual(item, data) and not bar_on:
+                toolbar_hidden.append(key)
+            title = str(item.data(_TITLE) or "").strip()
+            if title and kind != "plugin":
+                titles[key] = title
+            if kind == "plugin":
+                added.append(key)
+            if kind == "thirdparty":
+                entry = item.data(_EXTRA) or {}
+                if isinstance(entry, dict):
+                    entry = dict(entry)
+                    entry["id"] = key
+                    thirdparty.append(entry)
+            if kind == "group":
+                groups.append({"id": key, "title": title})
+            group_id = str(item.data(_GROUP) or "")
+            if group_id and kind != "group":
+                membership[key] = group_id
+        dropped = set(str(item) for item in data.get("dropped") or [])
+        present = [key for key, _label, _sep in pairs or []]
+        for key in present:
+            if key in dropped or key in order:
+                continue
+            order.append(key)
+        data["order"] = order
+        data["hidden"] = hidden
+        data["titles"] = titles
+        data["added"] = added
+        data["thirdparty"] = thirdparty
+        data["groups"] = groups
+        data["membership"] = membership
+        data["toolbar_hidden"] = toolbar_hidden
+        seen = set(data.get("seen_keys") or [])
+        seen.update(key for key in present if _is_menu_native_key(key) or str(key).startswith("sep:"))
+        data["seen_keys"] = sorted(seen)
+        data["seen"] = True
+        if self._kind == "group":
+            data["added"] = []
+            data["thirdparty"] = []
+            data["thirdparty_toolbar_hidden"] = []
+        save_menu(data, self._kind)
+        self._loaded = False
+        self.ensure_loaded()
 
     def _on_title(self, text):
         item = self.list.currentItem()

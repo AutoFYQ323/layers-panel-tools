@@ -2370,6 +2370,9 @@ AR = {
 }
 
 
+DE = {}
+
+
 def _load_extra():
     """Merge sentences added after 1.0.3. Loaded by path so check_i18n can import this file alone."""
     import importlib.util
@@ -2383,6 +2386,8 @@ def _load_extra():
     ES.update(module.ES)
     FR.update(module.FR)
     AR.update(module.AR)
+    if getattr(module, "DE", None):
+        DE.update(module.DE)
 
 
 def _load_line_dir():
@@ -2400,7 +2405,24 @@ def _load_line_dir():
     ES.update(module.ES)
     FR.update(module.FR)
     AR.update(module.AR)
+    if getattr(module, "DE", None):
+        DE.update(module.DE)
+
+
+def _load_de():
+    '''German covers every scanned sentence. Loaded by path, like the other catalogs.'''
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).with_name("catalog_de.py")
+    if not path.is_file():
+        return
+    spec = importlib.util.spec_from_file_location("lpt_catalog_de", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    DE.update(module.DE)
 
 
 _load_extra()
 _load_line_dir()
+_load_de()

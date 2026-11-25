@@ -19,6 +19,7 @@ from qgis.PyQt.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QSizePolicy,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -51,8 +52,25 @@ _CONTROLLER = None
 _SETTINGS_KEY = "multiline"
 _TEMP_LAYER_NAME = "多点画线_临时"
 _ID_ROLE = user_role()
+_NAME_ROLE = user_role(1)
 _PROJECT_GEN = [0]
 _PROJECT_WATCHED = [False]
+
+
+def _point_layer_caption(layer):
+    name = ""
+    try:
+        name = layer.name() or ""
+    except Exception:
+        name = ""
+    count = 0
+    try:
+        count = int(layer.featureCount())
+    except Exception:
+        count = 0
+    if count < 0:
+        count = 0
+    return "%s(%d)" % (name, count)
 
 
 def _notify(parent, title, text, warning=False):
@@ -1579,6 +1597,7 @@ class MultilineDialog(QDialog):
         self.points_list = QListWidget(self)
         self.points_list.setSelectionMode(qt_attr(QAbstractItemView, "ExtendedSelection"))
         left.addWidget(self.points_list, 1)
+        self.left_panel.setSizePolicy(qt_attr(QSizePolicy, "Ignored"), qt_attr(QSizePolicy, "Preferred"))
         layout.addWidget(self.left_panel, 1)
 
         right_panel = QWidget(self)
@@ -1682,7 +1701,8 @@ class MultilineDialog(QDialog):
         row2.addWidget(self.toggle_btn)
         row2.addWidget(self.refresh_btn)
         right.addLayout(row2)
-        layout.addWidget(right_panel, 1)
+        right_panel.setSizePolicy(qt_attr(QSizePolicy, "Ignored"), qt_attr(QSizePolicy, "Preferred"))
+        layout.addWidget(right_panel, 3)
 
         self.frame_btn.clicked.connect(self._start_pick)
         self.undo_btn.clicked.connect(self._undo)
@@ -1873,8 +1893,9 @@ class MultilineDialog(QDialog):
         for layer in list(QgsProject.instance().mapLayers().values()):
             if not _is_point_layer(layer):
                 continue
-            item = QListWidgetItem(layer.name())
+            item = QListWidgetItem(_point_layer_caption(layer))
             item.setData(_ID_ROLE, layer.id())
+            item.setData(_NAME_ROLE, layer.name() or "")
             self.points_list.addItem(item)
         if saved.get("source_point_layer_ids"):
             selected_ids = set(saved["source_point_layer_ids"])
@@ -1882,7 +1903,8 @@ class MultilineDialog(QDialog):
             names = set(saved["source_point_layer_names"])
             for row in range(self.points_list.count()):
                 item = self.points_list.item(row)
-                if item.text() in names:
+                stored = str(item.data(_NAME_ROLE) or "")
+                if stored in names or item.text() in names:
                     item.setSelected(True)
             selected_ids = None
         if selected_ids is not None:
@@ -1918,7 +1940,10 @@ class MultilineDialog(QDialog):
 
     def _collect(self):
         point_ids = [str(item.data(_ID_ROLE) or "") for item in self.points_list.selectedItems() if item.data(_ID_ROLE)]
-        point_names = [item.text() for item in self.points_list.selectedItems()]
+        point_names = [
+            str(item.data(_NAME_ROLE) or item.text())
+            for item in self.points_list.selectedItems()
+        ]
         return {
             "source_point_layer_ids": point_ids,
             "source_point_layer_names": point_names,

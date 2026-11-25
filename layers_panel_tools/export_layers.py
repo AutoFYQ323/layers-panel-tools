@@ -6,7 +6,8 @@ import os
 import shutil
 import tempfile
 
-from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtCore import Qt, QTimer, pyqtSignal
+from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -24,11 +25,16 @@ from qgis.PyQt.QtWidgets import (
 )
 from qgis.core import (
     QgsCoordinateTransform,
+    QgsFeature,
+    QgsFeatureRequest,
     QgsField,
+    QgsGeometry,
     QgsProject,
     QgsVectorFileWriter,
     QgsVectorLayer,
+    QgsWkbTypes,
 )
+from qgis.gui import QgsMapTool, QgsRubberBand
 
 from .buttons import ask, make_menu_action as build_menu_action, make_toolbar_button, qt_attr, report
 from .export_logic import merge_kind, merged_extension, unique_layer_name
@@ -203,8 +209,16 @@ class ExportDialog(QDialog):
         super().__init__(parent)
         self.iface = iface
         self.setObjectName("LayersPanelToolsExport")
-        self.resize(480, 520)
+        self.resize(576, 520)
         self._listening = False
+        self._scope_mode = "all"
+        self._scope_polygon = None
+        self._scope_crs = None
+        self._scope_tool = None
+        self._scope_band = None
+        self._scope_count_timer = QTimer(self)
+        self._scope_count_timer.setSingleShot(True)
+        self._scope_count_timer.timeout.connect(self._update_scope_count)
         layout = QVBoxLayout(self)
         self.hint = QLabel()
         self.hint.setWordWrap(True)
@@ -265,13 +279,21 @@ class ExportDialog(QDialog):
         option_row.addWidget(self.stack_box)
         option_row.addStretch(1)
         layout.addLayout(option_row)
-        actions = QHBoxLayout()
+        scope_row = QHBoxLayout()
+        self.scope_box = QComboBox()
+        self.scope_count = QLabel()
+        self.legend_only = QCheckBox()
         self.btn_export = QPushButton()
         self.btn_close = QPushButton()
-        actions.addWidget(self.btn_export)
-        actions.addStretch(1)
-        actions.addWidget(self.btn_close)
-        layout.addLayout(actions)
+        scope_row.addWidget(self.scope_box)
+        scope_row.addWidget(self.scope_count)
+        self.scope_count.hide()
+        scope_row.addSpacing(12)
+        scope_row.addWidget(self.legend_only)
+        scope_row.addStretch(1)
+        scope_row.addWidget(self.btn_export)
+        scope_row.addWidget(self.btn_close)
+        layout.addLayout(scope_row)
         self.search.textChanged.connect(self._filter)
         self.btn_all.clicked.connect(lambda: self._check("all", True))
         self.btn_none.clicked.connect(lambda: self._check("all", False))
@@ -281,6 +303,9 @@ class ExportDialog(QDialog):
         self.btn_browse.clicked.connect(self._browse)
         self.btn_export.clicked.connect(self._export)
         self.btn_close.clicked.connect(self.close)
+        self.scope_box.currentIndexChanged.connect(self._on_scope)
+        self.legend_only.toggled.connect(lambda *_args: self._schedule_scope_count())
+        self.list.itemChanged.connect(lambda *_args: self._schedule_scope_count())
         self.format_box.currentIndexChanged.connect(self._sync_merge)
         self.merge_box.toggled.connect(self._sync_merge)
         self.merge_box.setChecked(False)
@@ -314,6 +339,11 @@ class ExportDialog(QDialog):
         ))
         self.btn_export.setText(tr("导出"))
         self.btn_close.setText(tr("关闭"))
+        self.legend_only.setText(tr("只导出勾选的图层"))
+        self.legend_only.setToolTip(tr("不勾选时，范围内的要素照样导出，即使该图层在图层面板里没勾选。"))
+        self.scope_count.setToolTip(tr("这个范围里将要导出的要素总数。"))
+        self._fill_scope_combo()
+        self._schedule_scope_count()
         apply_direction(self)
         self._sync_merge()
         self.reload()
@@ -321,7 +351,166 @@ class ExportDialog(QDialog):
     def closeEvent(self, event):
         if self._listening:
             self._listening = False
+        self._drop_scope_tool(restore=True)
+        self._clear_scope_band()
         super().closeEvent(event)
+
+    def _fill_scope_combo(self):
+        current = getattr(self, "_scope_mode", "all") or "all"
+        self.scope_box.blockSignals(True)
+        self.scope_box.clear()
+        self.scope_box.addItem(tr("全部"), "all")
+        self.scope_box.addItem(tr("当前可见"), "visible")
+        self.scope_box.addItem(tr("手动选择区域"), "polygon")
+        index = self.scope_box.findData(current)
+        self.scope_box.setCurrentIndex(0 if index < 0 else index)
+        self.scope_box.blockSignals(False)
+        self.scope_box.setToolTip(tr("左键加点，右键或回车结束。按 Esc 取消。"))
+
+    def _on_scope(self, index):
+        mode = str(self.scope_box.itemData(index) or "all")
+        self._scope_mode = mode
+        if mode == "polygon":
+            self._start_polygon()
+            return
+        self._scope_polygon = None
+        self._scope_crs = None
+        self._clear_scope_band()
+        self._drop_scope_tool(restore=True)
+        self._schedule_scope_count()
+
+    def _start_polygon(self):
+        canvas = self.iface.mapCanvas()
+        if canvas is None:
+            return
+        self._clear_scope_band()
+        self._drop_scope_tool(restore=False)
+        tool = _ExportPolygonTool(canvas)
+        self._scope_tool = tool
+        self._scope_prev_tool = canvas.mapTool()
+        tool.finished.connect(self._finish_polygon)
+        canvas.setMapTool(tool)
+        try:
+            canvas.setFocus()
+        except Exception:
+            pass  # nosec
+        QTimer.singleShot(0, self._minimize_for_polygon)
+
+    def _minimize_for_polygon(self):
+        if getattr(self, "_scope_tool", None) is None:
+            return
+        self.showMinimized()
+        main = self.iface.mainWindow()
+        if main is not None:
+            try:
+                main.raise_()
+                main.activateWindow()
+            except Exception:
+                pass  # nosec
+
+    def _finish_polygon(self, geom):
+        self._scope_tool = None
+        if geom is not None and not geom.isEmpty():
+            self._scope_polygon = geom
+            try:
+                self._scope_crs = self.iface.mapCanvas().mapSettings().destinationCrs()
+            except Exception:
+                self._scope_crs = None
+        else:
+            self._scope_polygon = None
+            self._scope_crs = None
+            self._clear_scope_band()
+        self._restore_scope_tool()
+        self._show_scope_band()
+        self._schedule_scope_count()
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def _drop_scope_tool(self, restore=True):
+        tool = getattr(self, "_scope_tool", None)
+        self._scope_tool = None
+        canvas = self.iface.mapCanvas()
+        if tool is not None and canvas is not None:
+            try:
+                tool.finished.disconnect(self._finish_polygon)
+            except Exception:
+                pass  # nosec
+            if canvas.mapTool() is tool:
+                try:
+                    canvas.unsetMapTool(tool)
+                except Exception:
+                    pass  # nosec
+        if restore:
+            self._restore_scope_tool()
+
+    def _restore_scope_tool(self):
+        prev = getattr(self, "_scope_prev_tool", None)
+        self._scope_prev_tool = None
+        canvas = self.iface.mapCanvas()
+        if prev is None or canvas is None:
+            return
+        try:
+            canvas.setMapTool(prev)
+        except Exception:
+            pass  # nosec
+
+    def _schedule_scope_count(self):
+        timer = getattr(self, "_scope_count_timer", None)
+        if timer is not None:
+            timer.start(200)
+
+    def _update_scope_count(self):
+        mode = getattr(self, "_scope_mode", "all") or "all"
+        if mode == "all" or not hasattr(self, "scope_count"):
+            self.scope_count.hide()
+            return
+        total = _count_export_features(
+            self._chosen_layers(),
+            mode,
+            getattr(self, "_scope_polygon", None),
+            getattr(self, "_scope_crs", None),
+            self.legend_only.isChecked(),
+        )
+        self.scope_count.setText(tr("共 %d 个") % int(total))
+        self.scope_count.show()
+
+    def _show_scope_band(self):
+        geom = getattr(self, "_scope_polygon", None)
+        canvas = self.iface.mapCanvas()
+        if geom is None or geom.isEmpty() or canvas is None:
+            self._clear_scope_band()
+            return
+        band = getattr(self, "_scope_band", None)
+        if band is None:
+            band = QgsRubberBand(canvas, _geom_kind("PolygonGeometry", "Polygon"))
+            band.setColor(QColor(0, 120, 215, 40))
+            band.setStrokeColor(QColor(0, 90, 180))
+            band.setWidth(2)
+            self._scope_band = band
+        band.reset(_geom_kind("PolygonGeometry", "Polygon"))
+        try:
+            band.setToGeometry(geom, None)
+        except Exception:
+            band.setToGeometry(geom)
+
+    def _clear_scope_band(self):
+        band = getattr(self, "_scope_band", None)
+        self._scope_band = None
+        if band is None:
+            return
+        try:
+            band.reset()
+            band.hide()
+        except Exception:
+            pass  # nosec
+        try:
+            canvas = self.iface.mapCanvas()
+            scene = canvas.scene() if canvas is not None else None
+            if scene is not None:
+                scene.removeItem(band)
+        except Exception:
+            pass  # nosec
 
     def reload(self):
         if not self._listening:
@@ -449,6 +638,25 @@ class ExportDialog(QDialog):
             if not folder or not os.path.isdir(folder):
                 report(self, tr("批量导出"), tr("请先选择导出文件夹。"), warning=True)
                 return
+        mode = getattr(self, "_scope_mode", "all") or "all"
+        polygon = getattr(self, "_scope_polygon", None)
+        if mode == "polygon" and (polygon is None or polygon.isEmpty()):
+            report(self, tr("批量导出"), tr("请先在地图上框选导出范围。"), warning=True)
+            return
+        layers = _prepare_export_layers(
+            layers,
+            mode,
+            polygon,
+            getattr(self, "_scope_crs", None),
+            self.legend_only.isChecked(),
+        )
+        if not layers:
+            report(self, tr("批量导出"), tr("没有可导出的要素。"), warning=True)
+            return
+        if mode == "polygon":
+            self._clear_scope_band()
+            self._scope_polygon = None
+            self._scope_crs = None
         _write_layers(
             self.iface,
             self,
@@ -561,6 +769,238 @@ def _add_output(iface, path, layer_name, title):
         QgsProject.instance().addMapLayer(layer)
     except Exception:
         pass  # nosec
+
+
+def _legend_visible(layer):
+    """图层面板勾选，含上级组。节点找不到时当作没勾选。"""
+    try:
+        root = QgsProject.instance().layerTreeRoot()
+        node = root.findLayer(layer.id()) if root is not None else None
+    except Exception:
+        return False
+    if node is None:
+        return False
+    try:
+        return bool(node.isVisible())
+    except Exception:
+        return False
+
+
+def _canvas_scope():
+    try:
+        from qgis.utils import iface
+
+        canvas = iface.mapCanvas()
+    except Exception:
+        return None
+    if canvas is None:
+        return None
+    rect = canvas.extent()
+    if rect is None or rect.isEmpty():
+        return None
+    geom = QgsGeometry.fromRect(rect)
+    if geom is None or geom.isEmpty():
+        return None
+    try:
+        crs = canvas.mapSettings().destinationCrs()
+    except Exception:
+        crs = None
+    return geom, crs
+
+
+def _scope_pair(mode, polygon, crs):
+    if mode == "visible":
+        return _canvas_scope()
+    if mode == "polygon":
+        if polygon is None or polygon.isEmpty():
+            return None
+        return QgsGeometry(polygon), crs
+    return None
+
+
+def _scope_target(layer, scope):
+    """范围换到图层坐标系。失败时返回 None，调用方保留原图层。"""
+    if scope is None:
+        return None
+    poly, src = scope
+    target = QgsGeometry(poly)
+    try:
+        layer_crs = layer.crs()
+    except Exception:
+        layer_crs = None
+    if (
+        layer_crs is not None
+        and layer_crs.isValid()
+        and src is not None
+        and src.isValid()
+        and layer_crs != src
+    ):
+        try:
+            transform = QgsCoordinateTransform(src, layer_crs, QgsProject.instance())
+            target.transform(transform)
+        except Exception:
+            return None
+    box = target.boundingBox()
+    try:
+        pad = max(box.width(), box.height(), 1.0) * 1e-9
+        box.grow(pad)
+    except Exception:
+        pass  # nosec
+    engine = None
+    try:
+        engine = QgsGeometry.createGeometryEngine(target.constGet())
+        engine.prepareGeometry()
+    except Exception:
+        engine = None
+    return box, engine, target
+
+
+def _feature_in_scope(feature, box, engine, target):
+    geometry = feature.geometry()
+    if geometry is None or geometry.isEmpty():
+        return False
+    try:
+        if not box.intersects(geometry.boundingBox()):
+            return False
+        if engine is not None:
+            return bool(engine.intersects(geometry.constGet()))
+        return bool(geometry.intersects(target))
+    except Exception:
+        return False
+
+
+def _memory_copy(layer, features):
+    mem = None
+    try:
+        from qgis.core import QgsMemoryProviderUtils
+
+        mem = QgsMemoryProviderUtils.createMemoryLayer(
+            layer.name(), layer.fields(), layer.wkbType(), layer.crs()
+        )
+    except Exception:
+        mem = None
+    if mem is None or not mem.isValid():
+        try:
+            wkb = QgsWkbTypes.displayString(layer.wkbType())
+        except Exception:
+            wkb = "Point"
+        authid = ""
+        try:
+            if layer.crs().isValid():
+                authid = layer.crs().authid()
+        except Exception:
+            authid = ""
+        mem = QgsVectorLayer("%s?crs=%s" % (wkb, authid), layer.name(), "memory")
+        if mem is None or not mem.isValid():
+            return None
+        try:
+            mem.dataProvider().addAttributes(list(layer.fields()))
+            mem.updateFields()
+        except Exception:
+            return None
+    clones = []
+    for feature in features:
+        clone = QgsFeature(mem.fields())
+        try:
+            clone.setAttributes(feature.attributes())
+        except Exception:
+            pass  # nosec
+        geometry = feature.geometry()
+        if geometry is not None and not geometry.isEmpty():
+            clone.setGeometry(QgsGeometry(geometry))
+        clones.append(clone)
+    try:
+        provider = mem.dataProvider()
+        if clones:
+            provider.addFeatures(clones)
+        mem.updateExtents()
+    except Exception:
+        return None
+    return mem
+
+
+def _scoped_copy(layer, mode, polygon, crs):
+    scope = _scope_pair(mode, polygon, crs)
+    if scope is None:
+        return None
+    target = _scope_target(layer, scope)
+    if target is None:
+        return layer
+    box, engine, poly = target
+    request = QgsFeatureRequest()
+    try:
+        request.setFilterRect(box)
+    except Exception:
+        pass  # nosec
+    matched = []
+    try:
+        iterator = layer.getFeatures(request)
+    except Exception:
+        return None
+    for feature in iterator:
+        if _feature_in_scope(feature, box, engine, poly):
+            matched.append(feature)
+    if not matched:
+        return None
+    return _memory_copy(layer, matched)
+
+
+def _count_features_in_scope(layer, mode, polygon, crs):
+    """Count matching features without copying them. Same keep-or-drop rules as the export."""
+    if layer is None or mode not in ("visible", "polygon"):
+        return 0
+    scope = _scope_pair(mode, polygon, crs)
+    if scope is None:
+        return 0
+    target = _scope_target(layer, scope)
+    if target is None:
+        try:
+            count = int(layer.featureCount())
+        except Exception:
+            return 0
+        return count if count > 0 else 0
+    box, engine, poly = target
+    request = QgsFeatureRequest()
+    try:
+        request.setFilterRect(box)
+    except Exception:
+        pass  # nosec
+    try:
+        iterator = layer.getFeatures(request)
+    except Exception:
+        return 0
+    total = 0
+    for feature in iterator:
+        if _feature_in_scope(feature, box, engine, poly):
+            total += 1
+    return total
+
+
+def _count_export_features(layers, mode, polygon, crs, legend_only):
+    if mode not in ("visible", "polygon"):
+        return 0
+    total = 0
+    for layer in layers:
+        if legend_only and not _legend_visible(layer):
+            continue
+        total += _count_features_in_scope(layer, mode, polygon, crs)
+    return total
+
+
+def _prepare_export_layers(layers, mode, polygon, crs, legend_only):
+    """图例勾选在三种范围下都生效。空间范围只在当前可见和手动画区时裁要素。"""
+    kept = []
+    for layer in layers:
+        if legend_only and not _legend_visible(layer):
+            continue
+        if mode in ("visible", "polygon"):
+            scoped = _scoped_copy(layer, mode, polygon, crs)
+            if scoped is None:
+                continue
+            kept.append(scoped)
+        else:
+            kept.append(layer)
+    return kept
 
 
 def _write_layers(iface, parent, layers, folder, driver, ext, encoding, add_to_canvas, merge=False, target="", one_table=False):
@@ -956,3 +1396,135 @@ def _write_merged(iface, parent, layers, folder, driver, ext, encoding, add_to_c
         iface.mapCanvas().refresh()
     except Exception:
         pass  # nosec
+
+
+def _geom_kind(name, qgis_name):
+    try:
+        from qgis.core import Qgis
+
+        group = getattr(Qgis, "GeometryType", None)
+        if group is not None and hasattr(group, qgis_name):
+            return getattr(group, qgis_name)
+    except Exception:
+        pass  # nosec
+    return getattr(QgsWkbTypes, name, 0)
+
+
+def _mouse_button(name):
+    value = getattr(Qt, name, None)
+    if value is None:
+        value = getattr(getattr(Qt, "MouseButton", Qt), name, None)
+    return value
+
+
+def _key_code(name):
+    value = getattr(Qt, name, None)
+    if value is None:
+        value = getattr(getattr(Qt, "Key", Qt), name, None)
+    return value
+
+
+class _ExportPolygonTool(QgsMapTool):
+    """左键加点，右键或回车结束，Esc 取消。结束时发出多边形，取消时发出 None。"""
+
+    finished = pyqtSignal(object)
+
+    def __init__(self, canvas):
+        super().__init__(canvas)
+        self._points = []
+        self._done = False
+        self._points_band = QgsRubberBand(canvas, _geom_kind("PointGeometry", "Point"))
+        self._line = QgsRubberBand(canvas, _geom_kind("LineGeometry", "Line"))
+        self._fill = QgsRubberBand(canvas, _geom_kind("PolygonGeometry", "Polygon"))
+        stroke = QColor(21, 101, 192)
+        self._points_band.setColor(stroke)
+        self._points_band.setIconSize(10)
+        self._points_band.setWidth(2)
+        self._line.setColor(stroke)
+        self._line.setWidth(2)
+        self._fill.setStrokeColor(stroke)
+        self._fill.setFillColor(QColor(21, 101, 192, 40))
+        self._fill.setWidth(2)
+
+    def canvasPressEvent(self, event):
+        if self._done:
+            return
+        if event.button() == _mouse_button("RightButton"):
+            self._finish(len(self._points) >= 3)
+            return
+        if event.button() != _mouse_button("LeftButton"):
+            return
+        point = self._map_point(event)
+        if point is None:
+            return
+        self._points.append(point)
+        self._redraw(None)
+
+    def canvasMoveEvent(self, event):
+        if self._done or not self._points:
+            return
+        self._redraw(self._map_point(event))
+
+    def keyPressEvent(self, event):
+        if self._done:
+            return
+        if event.key() == _key_code("Key_Escape"):
+            self._finish(False)
+            return
+        if event.key() in (_key_code("Key_Return"), _key_code("Key_Enter")):
+            self._finish(len(self._points) >= 3)
+
+    def _map_point(self, event):
+        try:
+            return self.canvas().getCoordinateTransform().toMapCoordinates(event.pos().x(), event.pos().y())
+        except Exception:
+            return None
+
+    def _redraw(self, ghost):
+        self._points_band.reset(_geom_kind("PointGeometry", "Point"))
+        self._line.reset(_geom_kind("LineGeometry", "Line"))
+        for point in self._points:
+            self._points_band.addPoint(point, False)
+            self._line.addPoint(point, False)
+        if ghost is not None:
+            self._line.addPoint(ghost, False)
+        if self._points:
+            self._line.addPoint(self._points[0], True)
+        else:
+            self._line.update()
+        self._points_band.update()
+        self._fill.reset(_geom_kind("PolygonGeometry", "Polygon"))
+        if len(self._points) >= 3:
+            for point in self._points:
+                self._fill.addPoint(point, False)
+            self._fill.addPoint(self._points[0], True)
+
+    def _clear(self):
+        point = _geom_kind("PointGeometry", "Point")
+        line = _geom_kind("LineGeometry", "Line")
+        polygon = _geom_kind("PolygonGeometry", "Polygon")
+        self._points_band.reset(point)
+        self._line.reset(line)
+        self._fill.reset(polygon)
+
+    def _finish(self, ok):
+        if self._done:
+            return
+        self._done = True
+        geom = None
+        if ok and len(self._points) >= 3:
+            ring = list(self._points) + [self._points[0]]
+            geom = QgsGeometry.fromPolygonXY([ring])
+            if geom is None or geom.isEmpty():
+                geom = None
+        self._clear()
+        self.finished.emit(geom)
+
+    def deactivate(self):
+        if not self._done:
+            self._done = True
+            self._clear()
+            self.finished.emit(None)
+        else:
+            self._clear()
+        super().deactivate()

@@ -92,7 +92,7 @@ QToolButton::menu-indicator {
 }
 """
 
-_LANGUAGE_MARK = {"zh": "CN", "en": "EN", "es": "ES", "fr": "FR", "ar": "AR"}
+_LANGUAGE_MARK = {"zh": "CN", "en": "EN", "es": "ES", "fr": "FR", "de": "DE", "ar": "AR"}
 
 
 class _RowCombo(QComboBox):
@@ -332,8 +332,10 @@ class SettingsDialog(QDialog):
         self.tabs.addTab(toolbar_page, "")
         from .context_menu import MenuSettingsPage
 
-        self.menu_page = MenuSettingsPage(iface, self)
+        self.menu_page = MenuSettingsPage(iface, self, kind="layer")
         self.tabs.addTab(self.menu_page, "")
+        self.group_page = MenuSettingsPage(iface, self, kind="group")
+        self.tabs.addTab(self.group_page, "")
         self.tabs.currentChanged.connect(self._on_tab)
         layout.addWidget(self.tabs, 1)
 
@@ -446,7 +448,8 @@ class SettingsDialog(QDialog):
     def retranslate(self, *_args):
         self.setWindowTitle(tr("图层面板工具设置"))
         self.tabs.setTabText(0, tr("工具条"))
-        self.tabs.setTabText(1, tr("系统属性"))
+        self.tabs.setTabText(1, tr("系统属性（图层）"))
+        self.tabs.setTabText(2, tr("系统属性（组）"))
         self.lbl_buttons.setText(tr("按钮"))
         self.lbl_title.setText(tr("自定义标题"))
         self.lbl_shortcut.setText(tr("快捷键"))
@@ -490,9 +493,11 @@ class SettingsDialog(QDialog):
         apply_direction(self)
         self._place_combos()
         self.menu_page.retranslate()
+        self.group_page.retranslate()
 
     def commit_menu(self):
         self.menu_page.commit()
+        self.group_page.commit()
 
     def toolbar_item_visible(self, button_id):
         button_id = str(button_id or "")
@@ -534,9 +539,11 @@ class SettingsDialog(QDialog):
             button.setEnabled(toolbar)
         if toolbar:
             self._update_delete()
-        else:
+        elif index == 1:
             self.menu_page.ensure_loaded()
             self.menu_page.sync_toolbar_titles()
+        else:
+            self.group_page.ensure_loaded()
 
     def _fill_languages(self):
         self.lang_menu.clear()

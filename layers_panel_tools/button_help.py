@@ -38,6 +38,7 @@ tr(
 tr("控制图层面板图层名旁是否显示要素个数，可作用于全部或已选矢量图层。")
 tr("按方案记住各图层及分类的开关状态，可套用、保存、管理多套方案。")
 tr("用预设一键显示某套栅格底图并隐藏其它预设底图，可管理预设列表。")
+tr("点开后列出当前图层的字段。第一项是不显示；选一个字段就把该字段当作标注。")
 tr(
     "点图标打开菜单，可按名称/几何/目录/要素数/坐标系等排序或分组，"
     "导出图层清单 CSV，保存与恢复快照开关，删除空组，或打开整理窗口细调。"
@@ -76,6 +77,7 @@ _BUTTON_LABELS = (
     "点图标打开菜单，可一次打开或关闭全部图层、已选图层的标注，"
     "或切换已选图层的标注开关。"
 )
+_BUTTON_FIELD_LABEL = "点开后列出当前图层的字段。第一项是不显示；选一个字段就把该字段当作标注。"
 _BUTTON_SELECT = (
     "点图标打开菜单。「全图居中」缩放到点/线/面矢量范围（不含底图）。"
     "「选中地图可见图层」「全选」「反选」等同栏：按当前地图视口或全部开关图层。"
@@ -161,6 +163,7 @@ _NATIVE_HELP = "图层面板自带按钮，功能与 QGIS 默认一致，详见 
 BUTTON_HELP = {
     SETTINGS_ID: _BUTTON_SETTINGS,
     "lpt:labels": _BUTTON_LABELS,
+    "lpt:field_label": _BUTTON_FIELD_LABEL,
     "lpt:select": _BUTTON_SELECT,
     "lpt:layer_manager": _BUTTON_MANAGER,
     "lpt:edit_timeline": _BUTTON_TIMELINE,

@@ -983,6 +983,176 @@ def _rows():
         'Pas un nombre',
         'ليست رقمًا',
     )
+    add(
+        "系统属性（图层）",
+        "System properties (layers)",
+        "Propiedades del sistema (capas)",
+        "Propriétés système (couches)",
+        "خصائص النظام (الطبقات)",
+    )
+    add(
+        "系统属性（组）",
+        "System properties (groups)",
+        "Propiedades del sistema (grupos)",
+        "Propriétés système (groupes)",
+        "خصائص النظام (المجموعات)",
+    )
+    add(
+        "增加分割线",
+        "Add separator",
+        "Añadir separador",
+        "Ajouter un séparateur",
+        "إضافة فاصل",
+    )
+    add(
+        "删除分割线",
+        "Remove separator",
+        "Quitar separador",
+        "Supprimer le séparateur",
+        "حذف الفاصل",
+    )
+    add(
+        "只恢复组的右键菜单。",
+        "Restore only the group right-click menu.",
+        "Restaura solo el menú contextual del grupo.",
+        "Ne restaure que le menu contextuel du groupe.",
+        "يستعيد قائمة النقر بالزر الأيمن للمجموعة فقط.",
+    )
+    add(
+        "自定义标注",
+        "Custom label",
+        "Etiqueta personalizada",
+        "Étiquette personnalisée",
+        "تسمية مخصصة",
+    )
+    add(
+        "点开后列出当前图层的字段。第一项是不显示；选一个字段就把该字段当作标注。",
+        "Opens a list of the current layer’s fields. The first item turns labels off; choosing a field uses that field as the label.",
+        "Abre la lista de campos de la capa actual. La primera opción oculta las etiquetas; elegir un campo lo usa como etiqueta.",
+        "Ouvre la liste des champs de la couche actuelle. La première entrée masque les étiquettes ; choisir un champ l’utilise comme étiquette.",
+        "يفتح قائمة حقول الطبقة الحالية. البند الأول يخفي التسميات؛ واختيار حقل يجعله التسمية.",
+    )
+    add(
+        "不显示",
+        "Don’t show",
+        "No mostrar",
+        "Ne pas afficher",
+        "عدم العرض",
+    )
+    add(
+        "请先在图层面板里选中一个矢量图层。",
+        "Select a vector layer in the Layers panel first.",
+        "Primero selecciona una capa vectorial en el panel de capas.",
+        "Sélectionnez d’abord une couche vectorielle dans le panneau des couches.",
+        "حدد أولًا طبقة متجهة في لوحة الطبقات.",
+    )
+    add(
+        "当前可见",
+        "Current view",
+        "Vista actual",
+        "Vue actuelle",
+        "العرض الحالي",
+    )
+    add(
+        "手动选择区域",
+        "Draw an area",
+        "Dibujar un área",
+        "Dessiner une zone",
+        "رسم منطقة",
+    )
+    add(
+        "只导出图层面板里勾选着的图层",
+        "Export only layers checked in the Layers panel",
+        "Exportar solo las capas marcadas en el panel de capas",
+        "N’exporter que les couches cochées dans le panneau des couches",
+        "تصدير الطبقات المحددة في لوحة الطبقات فقط",
+    )
+    add(
+        "不勾选时，范围内的要素照样导出，即使该图层在图层面板里没勾选。",
+        "When unchecked, features inside the extent are still exported even if that layer is unchecked in the Layers panel.",
+        "Si no está marcada, las entidades del ámbito se exportan aunque esa capa no esté marcada en el panel de capas.",
+        "Si elle est décochée, les entités de l’emprise sont quand même exportées, même si cette couche n’est pas cochée dans le panneau des couches.",
+        "عند عدم التحديد تُصدَّر المعالم داخل النطاق حتى لو لم تكن الطبقة محددة في لوحة الطبقات.",
+    )
+    add(
+        "请先在地图上框选导出范围。",
+        "Draw the export area on the map first.",
+        "Primero dibuja el área de exportación en el mapa.",
+        "Dessinez d’abord la zone d’export sur la carte.",
+        "ارسم أولًا نطاق التصدير على الخريطة.",
+    )
+    add(
+        "没有可导出的要素。",
+        "There are no features to export.",
+        "No hay entidades para exportar.",
+        "Aucune entité à exporter.",
+        "لا توجد معالم للتصدير.",
+    )
+    add(
+        "还没有方案",
+        "No schemes yet",
+        "Aún no hay esquemas",
+        "Pas encore de schéma",
+        "لا توجد مخططات بعد",
+    )
+    add(
+        "菜单只列出已保存的方案。点哪一个才套用哪一个。不会自动套用，也不会自动新增方案。",
+        "The menu lists only saved schemes. Click one to apply that one. Nothing is applied automatically, and no scheme is added automatically.",
+        "El menú solo lista los esquemas guardados. Pulsa uno para aplicar ese. No se aplica nada solo, ni se añade un esquema solo.",
+        "Le menu ne liste que les schémas enregistrés. Cliquez sur l’un d’eux pour l’appliquer. Rien n’est appliqué automatiquement, et aucun schéma n’est ajouté automatiquement.",
+        "تعرض القائمة المخططات المحفوظة فقط. انقر واحدًا لتطبيقه. لا يُطبَّق شيء تلقائيًا، ولا يُضاف مخطط تلقائيًا.",
+    )
+    add(
+        "重新载入",
+        "Reload",
+        "Recargar",
+        "Recharger",
+        "إعادة التحميل",
+    )
+    add(
+        "按当前工程重新读取这一侧的右键菜单。已有的顺序和分组保留，缺的项会补上。",
+        "Read this side's right-click menu again from the current project. Existing order and groups stay; missing entries are added.",
+        "Vuelve a leer el menú contextual de este lado desde el proyecto actual. El orden y los grupos se conservan; se añaden las entradas que falten.",
+        "Relit le menu contextuel de ce côté depuis le projet actuel. L’ordre et les groupes restent ; les entrées manquantes sont ajoutées.",
+        "يعيد قراءة قائمة النقر بالزر الأيمن لهذا الجانب من المشروع الحالي. يبقى الترتيب والمجموعات، وتُضاف البنود الناقصة.",
+    )
+    add(
+        "工程里还没有图层组，读不到组的右键菜单。",
+        "This project has no layer group yet, so the group menu cannot be read.",
+        "Este proyecto aún no tiene un grupo de capas, así que no se puede leer su menú.",
+        "Ce projet n’a pas encore de groupe de couches, le menu du groupe ne peut pas être lu.",
+        "لا توجد مجموعة طبقات في هذا المشروع بعد، لذا لا يمكن قراءة قائمتها.",
+    )
+    add(
+        "工程里还没有图层，读不到图层右键菜单。",
+        "This project has no layer yet, so the layer menu cannot be read.",
+        "Este proyecto aún no tiene capas, así que no se puede leer su menú.",
+        "Ce projet n’a pas encore de couche, le menu de la couche ne peut pas être lu.",
+        "لا توجد طبقة في هذا المشروع بعد، لذا لا يمكن قراءة قائمتها.",
+    )
+    add(
+        "只导出勾选的图层",
+        "Checked layers only",
+        "Solo capas marcadas",
+        "Couches cochées seulement",
+        "الطبقات المؤشرة فقط",
+    )
+    add(
+        "共 %d 个",
+        "%d in all",
+        "%d en total",
+        "%d au total",
+        "%d إجمالًا",
+    )
+    add(
+        "这个范围里将要导出的要素总数。",
+        "How many features in this extent will be exported.",
+        "Cuántos elementos de esta extensión se exportarán.",
+        "Combien d’entités de cette étendue seront exportées.",
+        "عدد العناصر التي ستُصدَّر ضمن هذا النطاق.",
+    )
+    add("、", ", ", ", ", ", ", "، ")
+    add("{}：{}", "{}: {}", "{}: {}", "{}: {}", "{}: {}")
     return rows
 
 

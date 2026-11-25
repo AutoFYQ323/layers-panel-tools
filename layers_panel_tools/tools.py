@@ -26,6 +26,7 @@ from .visibility_all import make_action_hide as hide_all_action, make_action_sho
 from .copy_layer_files import make_action as copy_files_action
 from .layer_ops import make_action as layer_ops_action
 from .line_ends import make_action as line_ends_action
+from .field_label import make_action as field_label_action
 from .class_export import make_action as class_export_action
 from .multiline_tool import make_action as multiline_action
 from .line_dir_tool import make_action as line_dir_action
@@ -36,19 +37,20 @@ def extra_actions(iface):
     # 顺序与 order_logic.DEFAULT_PLUGIN_ORDER 一致：默认显示在前，默认隐藏在后。
     return [
         label_action(iface),
-        select_action(iface),
         layer_manager_action(iface),
         edit_timeline_action(iface),
         export_action(iface),
         poly_select_action(iface),
         feature_count_action(iface),
         switch_action(iface),
-        basemap_action(iface),
-        solo_action(iface),
         flash_action(iface),
         layer_ops_action(iface),
-        line_ends_action(iface),
         class_export_action(iface),
+        basemap_action(iface),
+        select_action(iface),
+        solo_action(iface),
+        line_ends_action(iface),
+        field_label_action(iface),
         multiline_action(iface),
         line_dir_action(iface),
         quick_classify_action(iface),

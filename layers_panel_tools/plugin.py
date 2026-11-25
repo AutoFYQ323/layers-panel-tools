@@ -23,6 +23,7 @@ from .flash_locate import make_menu_action as flash_menu_action
 from .flash_locate import stop_flash
 from .i18n import language_changed, tr
 from .label_toggle import make_menu_action as label_menu_action
+from .field_label import make_menu_action as field_label_menu_action
 from .layer_color_tags import close_layer_tags, make_menu_action as layer_tags_menu_action
 from .layer_manager import close_layer_manager, make_menu_action as layer_manager_menu_action
 from .move_layers import make_menu_action as move_menu_action
@@ -106,6 +107,7 @@ class LayersPanelToolsPlugin:
             move_menu_action(self.iface),
             opacity_menu_action(self.iface),
             label_menu_action(self.iface),
+            field_label_menu_action(self.iface),
             switch_menu_action(self.iface),
             basemap_menu_action(self.iface),
             style_menu_action(self.iface),
@@ -161,6 +163,12 @@ class LayersPanelToolsPlugin:
                 context.attach()
             except Exception as exc:
                 QgsMessageLog.logMessage("context menu failed: %s" % exc, _LOG, Qgis.MessageLevel.Warning)
+        try:
+            from .context_menu import restore_thirdparty_actions
+
+            restore_thirdparty_actions(self.iface)
+        except Exception:
+            pass  # nosec
 
     def unload(self):
         timer = self._ui_timer

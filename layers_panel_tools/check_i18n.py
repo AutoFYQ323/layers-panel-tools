@@ -24,7 +24,7 @@ def _load_tables():
     spec = importlib.util.spec_from_file_location("lpt_catalog_data", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return (("en", module.EN), ("es", module.ES), ("fr", module.FR), ("ar", module.AR))
+    return (("en", module.EN), ("es", module.ES), ("fr", module.FR), ("de", module.DE), ("ar", module.AR))
 
 
 def _docstrings(tree):
@@ -113,6 +113,7 @@ _ENDONYMS = (
     ("en", "English"),
     ("es", "Español"),
     ("fr", "Français"),
+    ("de", "Deutsch"),
     ("ar", "العربية"),
 )
 

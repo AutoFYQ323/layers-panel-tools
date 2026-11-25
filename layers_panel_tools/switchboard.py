@@ -36,7 +36,7 @@ from .qt_compat import accepted, run_dialog, user_role
 from .i18n import apply_direction, localize_button_box, subscribe, tr
 from .icons import load_icon
 from .plugin_settings import plugin_qsettings, set_value
-from .scheme_logic import add_layer_names, match_project, project_layer_names, replace_layer_name, saved_is_subset
+from .scheme_logic import match_project, project_layer_names, replace_layer_name
 from .scope import tell
 
 _KEY = "switch_book"
@@ -429,6 +429,20 @@ def _scheme_menu_caption(scheme, project):
     return sname
 
 
+def _blank_project(book, names):
+    """A project shell with no scheme. Schemes are added only by an explicit save."""
+    project_id, number = _next_id(book, "p")
+    title = _project_title() or (tr("项目%d") % number)
+    return {
+        "id": project_id,
+        "name": title,
+        "layers": list(names),
+        "renames": {},
+        "schemes": [],
+        "active": "",
+    }
+
+
 def add_scheme(book, project):
     """Store the current visibility as a new, active scheme. Returns its name."""
     scheme_id, number = _next_id(book, "s")
@@ -542,25 +556,6 @@ class SaveSchemeDialog(QDialog):
         return name, project_id
 
 
-# 同一次 QGIS 进程里，插件重新启用不再把已记住的图层开关套回去。
-# 记在 qgis.utils 上：插件模块被整包重新载入后，这个标记还在。
-# 打开工程时的自动套用仍由 readProject 触发。
-def _session_ready():
-    try:
-        import qgis.utils as qutils
-    except Exception:
-        return False
-    return bool(getattr(qutils, "_lpt_switch_session_ready", False))
-
-
-def _mark_session():
-    try:
-        import qgis.utils as qutils
-    except Exception:
-        return
-    qutils._lpt_switch_session_ready = True
-
-
 class SwitchController:
     def __init__(self, iface):
         self.iface = iface
@@ -591,9 +586,6 @@ class SwitchController:
         )
         self._plugin.setMenu(self._make_menu(iface.mainWindow()))
         self._hook()
-        if not _session_ready():
-            _mark_session()
-            self._schedule()
 
     def toolbar_action(self):
         return self._toolbar
@@ -648,72 +640,22 @@ class SwitchController:
         self._timer.start(1500)
 
     def sync(self):
+        """Remember which saved project matches the open layers.
+
+        Does not create a project or a scheme, and does not change layer visibility.
+        A scheme is stored only when the user saves one, and applied only when the user picks one.
+        """
         names = _layer_names()
         book = _load_book()
         projects = book.get("projects") or []
         manual_lock = bool(book.get("manual_lock"))
         lock_id = str(book.get("lock_project_id") or "").strip()
         locked = manual_lock and bool(lock_id) and _find_project(book, lock_id) is not None
-
         if locked:
-            found = lock_id
-        else:
-            found = match_project(projects, names)
-
-        if found:
-            if found != book.get("scratch"):
-                book["scratch"] = ""
-            project = _find_project(book, found)
-            if project is not None and add_layer_names(project, names, _capture()):
-                _save_book(book)
-            if found != self.current_id:
-                self.current_id = found
-                self._apply_active(project)
+            self.current_id = lock_id
             return
-
-        if locked:
-            if not names:
-                self.current_id = ""
-            elif lock_id != self.current_id:
-                self.current_id = lock_id
-            return
-
-        scratch = _find_project(book, book.get("scratch"))
-        if scratch is not None and names and saved_is_subset(scratch, names):
-            if add_layer_names(scratch, names, _capture()):
-                _save_book(book)
-            self.current_id = scratch.get("id") or ""
-            return
-        if not names:
-            self.current_id = ""
-            return
-        project = self._create_project(book, names, _capture())
-        book.setdefault("projects", []).append(project)
-        book["scratch"] = project["id"]
-        _save_book(book)
-        self.current_id = project["id"]
-
-    def _create_project(self, book, names, states):
-        project_id, number = _next_id(book, "p")
-        scheme_id, _scheme_number = _next_id(book, "s")
-        title = _project_title() or (tr("项目%d") % number)
-        return {
-            "id": project_id,
-            "name": title,
-            "layers": list(names),
-            "renames": {},
-            "schemes": [{"id": scheme_id, "name": tr("方案%d") % 1, "states": states}],
-            "active": scheme_id,
-        }
-
-    def _apply_active(self, project):
-        if project is None:
-            return
-        scheme = _find_scheme(project, project.get("active")) or (project.get("schemes") or [None])[0]
-        if scheme is None:
-            return
-        # 打开 QGIS、工程对上已有方案时自动套用，不弹「已套用方案」。
-        self._apply_scheme(project, scheme, quiet=True)
+        found = match_project(projects, names) if names else None
+        self.current_id = found or ""
 
     def _apply_scheme(self, project, scheme, quiet):
         states = scheme.get("states") or {}
@@ -775,18 +717,17 @@ class SwitchController:
         toggle = menu.addAction(tr("切换选中分类的开关"))
         toggle.triggered.connect(lambda *_args: self._toggle_selected_categories())
         menu.addSeparator()
+        self.sync()
         book = _load_book()
-        if not self.current_id:
-            self.sync()
-            book = _load_book()
         project = _find_project(book, self.current_id)
-        if project is None or not project.get("schemes"):
-            empty = menu.addAction(tr("还没有项目"))
+        schemes = (project.get("schemes") if project else None) or []
+        if not schemes:
+            empty = menu.addAction(tr("还没有方案"))
             empty.setEnabled(False)
         else:
             group = QActionGroup(menu)
             group.setExclusive(True)
-            for scheme in project.get("schemes") or []:
+            for scheme in schemes:
                 action = QAction(_scheme_menu_caption(scheme, project), menu)
                 action.setCheckable(True)
                 action.setChecked(scheme.get("id") == project.get("active"))
@@ -794,8 +735,8 @@ class SwitchController:
                 menu.addAction(action)
                 action.triggered.connect(lambda *_args, pid=project.get("id"), sid=scheme.get("id"): self._use(pid, sid))
             menu.addSeparator()
-            save = menu.addAction(tr("保存当前开关方案"))
-            save.triggered.connect(lambda *_args: self._open_save_dialog())
+        save = menu.addAction(tr("保存当前开关方案"))
+        save.triggered.connect(lambda *_args: self._open_save_dialog())
         menu.addSeparator()
         settings = menu.addAction(tr("设置"))
         settings.triggered.connect(self.open_settings)
@@ -825,8 +766,11 @@ class SwitchController:
         book = _load_book()
         project = _find_project(book, project_id)
         if project is None:
-            tell(self.iface, tr("图层开关"), tr("没有选择有效的项目。"), warning=True)
-            return
+            if project_id:
+                tell(self.iface, tr("图层开关"), tr("没有选择有效的项目。"), warning=True)
+                return
+            project = _blank_project(book, _layer_names())
+            book.setdefault("projects", []).append(project)
         states = _capture()
         for scheme in project.get("schemes") or []:
             if (scheme.get("name") or "").strip() == name:
@@ -987,7 +931,7 @@ class SwitchSettings(QDialog):
     def retranslate(self, *_args):
         self.setWindowTitle(tr("图层开关"))
         self.note.setText(
-            tr("图层组合和已有项目对得上时，会自动切过去并套用上次的方案。对不上就自动新增项目。")
+            tr("菜单只列出已保存的方案。点哪一个才套用哪一个。不会自动套用，也不会自动新增方案。")
             + " "
             + tr("双击表格里的开关或分类，可以改勾选。")
         )
@@ -1256,21 +1200,20 @@ class SwitchSettings(QDialog):
         scheme = self._current_scheme()
         if project is None or scheme is None:
             return
-        if len(project.get("schemes") or []) <= 1:
-            tell(self.controller.iface, tr("图层开关"), tr("至少留一个方案。"), warning=True)
-            return
         if not self._ask(tr("确定删除方案「%s」吗？") % (scheme.get("name") or "")):
             return
         project["schemes"] = [item for item in project.get("schemes") or [] if item.get("id") != scheme.get("id")]
         if project.get("active") == scheme.get("id"):
-            project["active"] = project["schemes"][0]["id"]
+            remaining = project.get("schemes") or []
+            project["active"] = remaining[0]["id"] if remaining else ""
         _save_book(self._book)
         self._show_project()
 
     def _save_scheme(self):
         project = self._current_project()
         if project is None:
-            return
+            project = _blank_project(self._book, _layer_names())
+            self._book.setdefault("projects", []).append(project)
         name = add_scheme(self._book, project)
         _save_book(self._book)
         self._show_project()

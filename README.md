@@ -1,19 +1,29 @@
 ﻿# Layers Panel Tools
 
-QGIS plugin that adds buttons to the toolbar of the existing Layers panel. Version **1.0.12**. There is no icon on the main QGIS toolbar, and the built-in Layers panel is not replaced.
+QGIS plugin that adds buttons to the toolbar of the existing Layers panel. Version **1.0.13**. There is no icon on the main QGIS toolbar, and the built-in Layers panel is not replaced.
 
 - **Page:** https://yuyouhui.online/tools/qgis/layers-panel-tools/
 - **Issues:** https://github.com/AutoFYQ323/layers-panel-tools/issues
 - **QGIS:** 3.28 through 4.99 (Qt 5 and Qt 6)
 - **License:** GNU GPL v2 (`layers_panel_tools/LICENSE`)
-- **Languages:** 中文, English, Español, Français, العربية. The first open follows the QGIS interface language, then the system language; anything else starts in English. The choice is remembered. Arabic lays plugin windows out from right to left.
+- **Languages:** 中文, English, Español, Français, Deutsch, العربية. The first open follows the QGIS interface language, then the system language; anything else starts in English. The choice is remembered. Arabic lays plugin windows out from right to left.
 - **Data:** local project layers and files you choose. This plugin does not download data, sign in to a website, or call an external service.
 
-## On by default (14)
+## On by default (first install, 10)
 
-Labels, batch select, layer manager, edit timeline, batch export, polygon select, feature count, visibility schemes, basemap presets, solo, flash locate, layer actions, line marks, and class export.
+Labels, layer manager, edit timeline, batch export, polygon select, feature count, visibility schemes, flash locate, layer actions, and class export. The settings button stays on.
 
-Sixteen more are one click away in the settings button at the end of the same toolbar: **multi-point draw line**, **line direction check**, **quick classify**, organize, repair sources, find, show all, hide all, move, opacity, copy style, rename, copy files, color tags, scale check, and render check. The old “split by field into subset layers” button is gone. Writing one file per field value is class export.
+A saved toolbar keeps its own checks. Basemap presets, batch select, solo, line marks, and custom field labels start off on a new install, together with multi-point draw line, line direction check, quick classify, organize, repair sources, find, show all, hide all, move, opacity, copy style, rename, copy files, color tags, scale check, and render check. The old “split by field into subset layers” button is gone. Writing one file per field value is class export.
+
+## What 1.0.13 adds
+
+- **System properties** are split into a layer page and a group page. Each page can reload the live right-click menu. QGIS submenus such as styles stay available after an item is moved into a group.
+- **Third-party toolbar checkbox:** checked by default, so the other plugin’s toolbar button stays visible. Uncheck it and confirm to hide that button. Disabling or uninstalling this plugin from the Plugin Manager puts those buttons back. Menu-only actions are not added to a toolbar.
+- **Visibility schemes** are stored only when you save one, and applied only when you click that scheme.
+- **Batch export** can use the current map view or a drawn area, and can limit itself to layers checked in the Layers panel. The drawn area stays until you export, switch mode, draw again, or close the dialog. A count appears when the scope is not the whole layer.
+- **Custom field labels** list the current vector layer’s fields. They start off the toolbar.
+- **Multi-point draw line** keeps the same window size, uses about a quarter of the width for the layer list, and shows each layer’s feature count.
+- **Deutsch** is available with the other five languages.
 
 ## What 1.0.12 adds (from 1.0.5)
 
@@ -30,7 +40,7 @@ When only a category row is selected, solo, flash, and “toggle the selected ca
 
 ## Install
 
-1. Download [layers_panel_tools_1.0.12.zip](https://github.com/AutoFYQ323/layers-panel-tools/releases), or use the `layers_panel_tools` folder in this repository. The same zip is also on the page above, named `layers-panel-tools-1.0.12.zip`. You can also search for Layers Panel Tools in the QGIS plugin repository.
+1. Download [layers_panel_tools_1.0.13.zip](https://github.com/AutoFYQ323/layers-panel-tools/releases), or use the `layers_panel_tools` folder in this repository. The same zip is also on the page above, named `layers-panel-tools-1.0.13.zip`. You can also search for Layers Panel Tools in the QGIS plugin repository.
 2. In QGIS: **Plugins → Manage and Install Plugins → Install from ZIP**.
 3. Quit QGIS completely and open it again. Buttons are on the Layers panel toolbar. Settings is the last button on that bar.
 
@@ -43,4 +53,4 @@ python layers_panel_tools/check_i18n.py
 python layers_panel_tools/self_test.py
 ```
 
-`check_i18n.py` requires every user-visible sentence in 中文, English, Español, Français, and العربية. Pack with `python TEST/pack_release.py`. The zip is written in `TEST` and is not committed.
+`check_i18n.py` requires every user-visible sentence in 中文, English, Español, Français, Deutsch, and العربية. Pack with `python TEST/pack_release.py`. The zip is written in `TEST` and is not committed.

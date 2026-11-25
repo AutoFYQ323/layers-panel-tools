@@ -1,19 +1,21 @@
 # -*- coding: utf-8 -*-
 """Language list. Chinese is the source text."""
 
-from .catalog_data import AR, EN, ES, FR
+from .catalog_data import AR, DE, EN, ES, FR
 
 LANG_ZH = "zh"
 LANG_EN = "en"
 LANG_ES = "es"
 LANG_FR = "fr"
 LANG_AR = "ar"
+LANG_DE = "de"
 
 _LOCALE_PREFIX = (
     ("zh", LANG_ZH),
     ("es", LANG_ES),
     ("fr", LANG_FR),
     ("ar", LANG_AR),
+    ("de", LANG_DE),
     ("en", LANG_EN),
 )
 
@@ -22,6 +24,7 @@ _TABLES = {
     LANG_ES: ES,
     LANG_FR: FR,
     LANG_AR: AR,
+    LANG_DE: DE,
 }
 
 _LABELS = (
@@ -29,11 +32,12 @@ _LABELS = (
     (LANG_ES, "Español"),
     (LANG_FR, "Français"),
     (LANG_AR, "العربية"),
+    (LANG_DE, "Deutsch"),
 )
 
 
 def known_languages():
-    return (LANG_ZH, LANG_EN, LANG_ES, LANG_FR, LANG_AR)
+    return (LANG_ZH, LANG_EN, LANG_ES, LANG_FR, LANG_DE, LANG_AR)
 
 
 def tables():
